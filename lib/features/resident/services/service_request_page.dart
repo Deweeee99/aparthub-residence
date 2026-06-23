@@ -1,12 +1,15 @@
-import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
-import '../../../data/data_dummy/service_request_dummy.dart';
+import '../../../models/service_request_models.dart';
+import '../../../services/api_service.dart';
+import 'widgets/service_attachment_section.dart';
 import 'widgets/service_status_badge.dart';
 import 'widgets/service_step_indicator.dart';
 
@@ -17,99 +20,251 @@ class ServiceRequestPage extends StatefulWidget {
     super.key,
     required this.onBack,
     required this.initialMode,
+    this.apiService,
+    this.attachmentPicker,
   });
 
   final VoidCallback onBack;
   final ServiceRequestInitialMode initialMode;
+  final ApiService? apiService;
+  final Future<String?> Function(ImageSource source)? attachmentPicker;
 
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
 
 class _ServiceRequestPageState extends State<ServiceRequestPage> {
-  final _dateTimeFormat = DateFormat('dd MMM yyyy, HH:mm');
+  static const _steps = [
+    'Create',
+    'Describe',
+    'Submitted',
+    'Tracking',
+    'History',
+  ];
+  static const _priorities = ['Low', 'Medium', 'High', 'Emergency'];
+
+  late final ApiService _apiService = widget.apiService ?? ApiService();
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _commentController;
-  late List<ServiceTicketRecord> _tickets;
+  late final TextEditingController _preferredScheduleController;
+  final _dateTimeFormat = DateFormat('dd MMM yyyy, HH:mm');
+  final _imagePicker = ImagePicker();
+
+  ServiceRequestCatalog? _catalog;
+  List<ServiceTicketRecord> _tickets = const [];
+  ServiceCategory? _selectedCategory;
+  ServiceSubcategory? _selectedSubcategory;
+  ServiceTicketRecord? _createdTicket;
+  ServiceTicketRecord? _trackingTicket;
+  List<String> _attachmentPaths = [];
 
   late int _serviceStep;
-  var _category = ServiceRequestDummy.defaultCategory;
-  var _priority = ServiceRequestDummy.defaultPriority;
+  var _priority = 'Medium';
   var _historyFilter = 'All';
-  var _rating = 5;
+  var _isLoadingCatalog = false;
+  var _isLoadingHistory = false;
   var _isSubmitting = false;
-  ServiceTicketRecord? _createdTicket;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _serviceStep = widget.initialMode == ServiceRequestInitialMode.history
-        ? ServiceRequestDummy.steps.length - 1
+        ? 4
         : 0;
-    _titleController = TextEditingController(
-      text: ServiceRequestDummy.defaultTitle,
-    );
-    _descriptionController = TextEditingController(
-      text: ServiceRequestDummy.defaultDescription,
-    );
-    _commentController = TextEditingController(
-      text: ServiceRequestDummy.defaultComment,
-    );
-    _tickets = List.of(ServiceRequestDummy.seedTickets);
+    _titleController = TextEditingController();
+    _descriptionController = TextEditingController();
+    _preferredScheduleController = TextEditingController();
+    _bootstrap();
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _commentController.dispose();
+    _preferredScheduleController.dispose();
     super.dispose();
   }
 
-  List<ServiceTicketRecord> get _filteredTickets {
-    return _tickets.where((ticket) {
-      return _historyFilter == 'All' || ticket.status == _historyFilter;
-    }).toList();
+  Future<void> _bootstrap() async {
+    if (widget.initialMode == ServiceRequestInitialMode.history) {
+      await _loadHistory(openHistory: true);
+      return;
+    }
+
+    await _loadCatalog();
   }
 
-  ServiceTicketRecord get _activeTicket => _createdTicket ?? _tickets.first;
+  Future<void> _loadCatalog() async {
+    setState(() {
+      _isLoadingCatalog = true;
+      _errorMessage = null;
+    });
 
-  void _goToStep(int step) {
-    setState(
-      () => _serviceStep = step.clamp(0, ServiceRequestDummy.steps.length - 1),
-    );
+    try {
+      final catalog = await _apiService.getServiceRequestCatalog();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _catalog = catalog;
+        _isLoadingCatalog = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingCatalog = false;
+        _errorMessage = error is ApiServiceException
+            ? error.message
+            : 'Data layanan belum bisa dimuat. Coba lagi.';
+      });
+    }
+  }
+
+  Future<void> _loadHistory({bool openHistory = false}) async {
+    setState(() {
+      _isLoadingHistory = true;
+      _errorMessage = null;
+      if (openHistory) {
+        _serviceStep = 4;
+      }
+    });
+
+    try {
+      final tickets = await _apiService.getServiceRequests();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _tickets = tickets;
+        _isLoadingHistory = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingHistory = false;
+        _errorMessage = error is ApiServiceException
+            ? error.message
+            : 'Data layanan belum bisa dimuat. Coba lagi.';
+      });
+    }
   }
 
   Future<void> _submitRequest() async {
     if (_isSubmitting) {
       return;
     }
-    setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) {
+
+    final selectedCategory = _selectedCategory;
+    final selectedSubcategory = _selectedSubcategory;
+    final title = _titleController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    if (selectedCategory == null) {
+      _showServiceSnack('Pilih kategori layanan terlebih dahulu.');
       return;
     }
-    final ticket = ServiceTicketRecord(
-      id: 'SR-${2400 + _tickets.length + 1}',
-      category: _category,
-      title: _titleController.text.trim().isEmpty
-          ? ServiceRequestDummy.defaultTitle
-          : _titleController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty
-          ? ServiceRequestDummy.defaultDescription
-          : _descriptionController.text.trim(),
-      priority: _priority,
-      status: 'Open',
-      assignee: 'Waiting assignment',
-      createdAt: DateTime(2026, 6, 22, 10, 0),
-    );
-    setState(() {
-      _tickets = [ticket, ..._tickets];
-      _createdTicket = ticket;
-      _isSubmitting = false;
-      _serviceStep = 2;
-    });
+    if (selectedSubcategory == null) {
+      _showServiceSnack('Pilih subkategori layanan terlebih dahulu.');
+      return;
+    }
+    if (title.isEmpty) {
+      _showServiceSnack('Judul masalah tidak boleh kosong.');
+      return;
+    }
+    if (description.isEmpty) {
+      _showServiceSnack('Deskripsi masalah tidak boleh kosong.');
+      return;
+    }
+    if (_priority.isEmpty) {
+      _showServiceSnack('Pilih prioritas layanan terlebih dahulu.');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final ticket = await _apiService.createServiceRequest(
+        categoryId: selectedCategory.id,
+        subcategoryId: selectedSubcategory.id,
+        title: title,
+        description: description,
+        priority: _priority,
+        residentId: _catalog?.residentId == 0 ? null : _catalog?.residentId,
+        preferredSchedule: _preferredScheduleController.text.trim().isEmpty
+            ? null
+            : _preferredScheduleController.text.trim(),
+        attachmentPaths: _attachmentPaths,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _createdTicket = ticket;
+        _trackingTicket = ticket;
+        _tickets = [ticket, ..._tickets];
+        _isSubmitting = false;
+        _serviceStep = 2;
+        _historyFilter = 'All';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isSubmitting = false);
+      _showServiceSnack(
+        error is ApiServiceException
+            ? error.message
+            : 'Service request belum bisa dikirim. Coba beberapa saat lagi.',
+      );
+    }
+  }
+
+  Future<void> _openTicketDetail(ServiceTicketRecord ticket) async {
+    try {
+      final detail = await _apiService.getServiceRequestDetail(ticket.id);
+      if (!mounted) {
+        return;
+      }
+      _showTicketDetailSheet(detail);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showServiceSnack(
+        error is ApiServiceException
+            ? error.message
+            : 'Data layanan belum bisa dimuat. Coba lagi.',
+      );
+    }
+  }
+
+  Future<void> _openTracking(ServiceTicketRecord ticket) async {
+    try {
+      final detail = await _apiService.getServiceRequestDetail(ticket.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _trackingTicket = detail;
+        _serviceStep = 3;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showServiceSnack(
+        error is ApiServiceException
+            ? error.message
+            : 'Data layanan belum bisa dimuat. Coba lagi.',
+      );
+    }
   }
 
   void _showServiceSnack(String message) {
@@ -118,9 +273,125 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _submitRating() {
-    _showServiceSnack('Thank you for your feedback.');
-    _goToStep(7);
+  List<String> get _historyFilters {
+    final statuses = <String>{
+      for (final ticket in _tickets)
+        if (ticket.status.trim().isNotEmpty) ticket.status.trim(),
+    }.toList()..sort();
+    return ['All', ...statuses];
+  }
+
+  List<ServiceTicketRecord> get _filteredTickets {
+    if (_historyFilter == 'All') {
+      return _tickets;
+    }
+    return _tickets.where((ticket) => ticket.status == _historyFilter).toList();
+  }
+
+  ServiceTicketRecord? get _activeTicket => _createdTicket ?? _trackingTicket;
+
+  void _goToStep(int step) {
+    setState(() => _serviceStep = step.clamp(0, _steps.length - 1));
+  }
+
+  Future<void> _showAttachmentSourcePicker() async {
+    if (_attachmentPaths.length >= 3) {
+      _showServiceSnack('Maksimal 3 lampiran foto per request.');
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: WhitePremiumCard(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add Attachment',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose a photo source for your service request.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  _AttachmentSourceTile(
+                    key: const ValueKey('attachment-source-camera'),
+                    icon: Icons.photo_camera_outlined,
+                    title: 'Camera',
+                    subtitle: 'Capture a new issue photo',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _pickAttachment(ImageSource.camera);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _AttachmentSourceTile(
+                    key: const ValueKey('attachment-source-gallery'),
+                    icon: Icons.photo_library_outlined,
+                    title: 'Gallery',
+                    subtitle: 'Choose an existing photo',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _pickAttachment(ImageSource.gallery);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAttachment(ImageSource source) async {
+    if (_attachmentPaths.length >= 3) {
+      _showServiceSnack('Maksimal 3 lampiran foto per request.');
+      return;
+    }
+
+    final pickedPath =
+        await widget.attachmentPicker?.call(source) ??
+        await _pickAttachmentPath(source);
+    if (!mounted || pickedPath == null || pickedPath.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      if (_attachmentPaths.contains(pickedPath) ||
+          _attachmentPaths.length >= 3) {
+        return;
+      }
+      _attachmentPaths = [..._attachmentPaths, pickedPath];
+    });
+  }
+
+  Future<String?> _pickAttachmentPath(ImageSource source) async {
+    final pickedFile = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 82,
+      maxWidth: 2200,
+    );
+    return pickedFile?.path;
+  }
+
+  void _removeAttachment(String path) {
+    setState(() {
+      _attachmentPaths = _attachmentPaths
+          .where((item) => item != path)
+          .toList(growable: false);
+    });
   }
 
   @override
@@ -133,13 +404,27 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         const SizedBox(height: 14),
         ServiceStepIndicator(
           currentStep: _serviceStep,
-          steps: ServiceRequestDummy.steps,
-          onStepSelected: _goToStep,
+          steps: _steps,
+          onStepSelected: _handleStepSelected,
         ),
         const SizedBox(height: 16),
         _buildStepContent(),
       ],
     );
+  }
+
+  void _handleStepSelected(int step) {
+    if (step == 4) {
+      _loadHistory(openHistory: true);
+      return;
+    }
+    if (step == 3 && _activeTicket != null) {
+      _openTracking(_activeTicket!);
+      return;
+    }
+    if (step <= _serviceStep) {
+      _goToStep(step);
+    }
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -148,7 +433,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       children: [
         IconButton(
           tooltip: 'Back',
-          onPressed: _serviceStep == 0 || _serviceStep == 7
+          onPressed: _serviceStep == 0 || _serviceStep == 4
               ? widget.onBack
               : () => _goToStep(_serviceStep - 1),
           padding: EdgeInsets.zero,
@@ -181,15 +466,28 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       0 => _buildCreateRequest(),
       1 => _buildDescribeIssue(),
       2 => _buildRequestSubmitted(),
-      3 => _buildAssignedToStaff(),
-      4 => _buildWorkInProgress(),
-      5 => _buildCompleted(),
-      6 => _buildRateService(),
+      3 => _buildTrackingStep(),
       _ => _buildTicketHistory(),
     };
   }
 
   Widget _buildCreateRequest() {
+    if (_isLoadingCatalog) {
+      return const _LoadingStateCard(message: 'Loading service catalog...');
+    }
+
+    if (_catalog == null && _errorMessage != null) {
+      return _ErrorStateCard(message: _errorMessage!, onRetry: _loadCatalog);
+    }
+
+    final catalog = _catalog;
+    if (catalog == null) {
+      return _ErrorStateCard(
+        message: 'Data layanan belum bisa dimuat. Coba lagi.',
+        onRetry: _loadCatalog,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -201,34 +499,89 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           ),
         ),
         const SizedBox(height: 12),
-        for (final option in ServiceRequestDummy.categories)
+        for (final category in catalog.categories)
           _ServiceCategoryCard(
-            title: option.title,
-            subtitle: option.subtitle,
-            icon: _categoryIcon(option.title),
-            selected: _category == option.title,
+            title: category.name,
+            subtitle: '${category.subcategories.length} service options',
+            icon: _categoryIcon(category.name),
+            selected: _selectedCategory?.id == category.id,
             onTap: () {
               setState(() {
-                _category = option.title;
-                _serviceStep = 1;
+                _selectedCategory = category;
+                _selectedSubcategory = null;
               });
             },
           ),
+        if (_selectedCategory != null) ...[
+          const SizedBox(height: 8),
+          WhitePremiumCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose a specific service option',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final subcategory in _selectedCategory!.subcategories)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _ServiceCategoryCard(
+                      title: subcategory.name,
+                      subtitle: _slaLabel(subcategory.sla),
+                      icon: Icons.tune_rounded,
+                      selected: _selectedSubcategory?.id == subcategory.id,
+                      onTap: () {
+                        setState(() => _selectedSubcategory = subcategory);
+                      },
+                    ),
+                  ),
+                _PrimaryStateButton(
+                  buttonKey: const ValueKey('continue-to-description-button'),
+                  label: 'Continue to Description',
+                  enabled: _selectedSubcategory != null,
+                  onPressed: () => _goToStep(1),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
 
   Widget _buildDescribeIssue() {
+    final subcategory = _selectedSubcategory;
+    final slaMinutes = subcategory?.sla.minutesForPriority(_priority) ?? 0;
+
     return WhitePremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _CardTitle(
             title: 'Describe Issue',
-            subtitle: 'Provide issue details and supporting photos.',
+            subtitle:
+                'Provide issue details, a preferred schedule note, and supporting photos.',
             icon: Icons.edit_note_outlined,
           ),
           const SizedBox(height: 16),
+          if (_selectedCategory != null || _selectedSubcategory != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_selectedCategory != null)
+                    _StaticPill(label: _selectedCategory!.name),
+                  if (_selectedSubcategory != null)
+                    _StaticPill(label: _selectedSubcategory!.name),
+                ],
+              ),
+            ),
           TextField(
             key: const ValueKey('service-title-field'),
             controller: _titleController,
@@ -236,33 +589,62 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           ),
           const SizedBox(height: 10),
           TextField(
+            key: const ValueKey('service-description-field'),
             controller: _descriptionController,
             minLines: 4,
             maxLines: 5,
             decoration: const InputDecoration(labelText: 'Problem description'),
           ),
           const SizedBox(height: 14),
-          const _PhotoUploadRow(),
-          const SizedBox(height: 14),
+          Text(
+            'Priority',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
           _ChoiceWrap(
-            items: ServiceRequestDummy.priorities,
+            items: _priorities,
             selected: _priority,
             onSelected: (value) => setState(() => _priority = value),
           ),
+          if (slaMinutes > 0) ...[
+            const SizedBox(height: 14),
+            _InfoPanel(
+              icon: Icons.timer_outlined,
+              title: 'Estimated SLA',
+              subtitle: '$slaMinutes minutes for $_priority priority',
+              status: 'Open',
+            ),
+          ],
           const SizedBox(height: 14),
-          const _InfoPanel(
-            icon: Icons.calendar_month_outlined,
-            title: 'Preferred Schedule',
-            subtitle: '22 Jun 2026 - 10:00 AM - 12:00 PM',
-            status: 'Open',
+          const _AutomaticScheduleNotice(
+            key: ValueKey('automatic-schedule-info'),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const ValueKey('preferred-schedule-field'),
+            controller: _preferredScheduleController,
+            minLines: 2,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Preferred schedule note',
+              hintText: 'Example: Morning after 09:00 or after office hours',
+            ),
+          ),
+          const SizedBox(height: 14),
+          _PhotoUploadRow(
+            attachmentPaths: _attachmentPaths,
+            onAddTap: _showAttachmentSourcePicker,
+            onRemove: _removeAttachment,
           ),
           const SizedBox(height: 16),
           LuxuryButton(
+            key: const ValueKey('submit-service-request-button'),
             label: _isSubmitting ? 'Submitting...' : 'Submit Request',
             icon: Icons.send_outlined,
-            onPressed: () {
-              unawaited(_submitRequest());
-            },
+            onPressed: _submitRequest,
           ),
         ],
       ),
@@ -270,7 +652,14 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildRequestSubmitted() {
-    final ticket = _activeTicket;
+    final ticket = _createdTicket;
+    if (ticket == null) {
+      return _ErrorStateCard(
+        message: 'Service request belum tersedia. Coba kirim ulang.',
+        onRetry: () => _goToStep(1),
+      );
+    }
+
     return WhitePremiumCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -293,231 +682,143 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           const SizedBox(height: 18),
           _DetailPanel(
             rows: [
-              ('Ticket Number', ticket.id),
+              ('Ticket Number', ticket.ticketNumber),
               ('Status', ticket.status),
-              ('Category', ticket.category),
+              ('Priority', ticket.priority),
+              ('Category', ticket.category.displayLabel),
+              ('Subcategory', ticket.subcategory.displayLabel),
+              if (ticket.slaState.isNotEmpty) ('SLA State', ticket.slaState),
+              if (ticket.slaDueAt.isNotEmpty)
+                ('SLA Due', _formatDateTime(ticket.slaDueAt)),
             ],
           ),
           const SizedBox(height: 18),
           LuxuryButton(
-            label: 'View Details',
+            label: 'View Detail',
             icon: Icons.visibility_outlined,
-            onPressed: () => _goToStep(3),
+            onPressed: () => _openTracking(ticket),
           ),
           const SizedBox(height: 10),
           _OutlineActionButton(
-            label: 'Back to Services',
-            icon: Icons.arrow_back_outlined,
-            onPressed: widget.onBack,
+            label: 'View History',
+            icon: Icons.history_outlined,
+            onPressed: () => _loadHistory(openHistory: true),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAssignedToStaff() {
-    return Column(
-      children: [
-        WhitePremiumCard(
-          child: Column(
-            children: [
-              const _CardTitle(
-                title: 'Assigned to Staff',
-                subtitle: 'Your request has been assigned to a technician.',
-                icon: Icons.engineering_outlined,
-              ),
-              const SizedBox(height: 18),
-              Container(
-                width: 96,
-                height: 96,
-                decoration: const BoxDecoration(
-                  color: AppColors.goldSoft,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_outline,
-                  color: AppColors.gold,
-                  size: 52,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                ServiceRequestDummy.technicianName,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                ServiceRequestDummy.technicianRole,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ServiceRequestDummy.technicianRating,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.gold,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const _InfoPanel(
-                icon: Icons.timer_outlined,
-                title: 'Estimated Arrival Time',
-                subtitle: '30 - 45 Minutes',
-                status: 'Assigned',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        _OutlineActionButton(
-          label: 'Contact Technician',
-          icon: Icons.phone_outlined,
-          onPressed: () => _showServiceSnack('Contact technician simulated.'),
-        ),
-        const SizedBox(height: 10),
-        LuxuryButton(
-          label: 'Track Progress',
-          icon: Icons.route_outlined,
-          onPressed: () => _goToStep(4),
-        ),
-      ],
-    );
-  }
+  Widget _buildTrackingStep() {
+    final ticket = _trackingTicket ?? _createdTicket;
+    if (ticket == null) {
+      return _ErrorStateCard(
+        message: 'Detail ticket belum tersedia. Coba buka dari riwayat.',
+        onRetry: () => _loadHistory(openHistory: true),
+      );
+    }
 
-  Widget _buildWorkInProgress() {
     return WhitePremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _CardTitle(
-            title: 'Work In Progress',
-            subtitle: 'Technician is working on your request.',
-            icon: Icons.construction_outlined,
-          ),
-          const SizedBox(height: 16),
-          const _InfoPanel(
-            icon: Icons.engineering_outlined,
-            title: 'Technician on Site',
-            subtitle: '10:15 AM',
-            status: 'Progress',
-          ),
-          const SizedBox(height: 16),
-          const _ProgressTimeline(activeIndex: 1),
-          const SizedBox(height: 16),
-          Container(
-            height: 126,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.borderSoft),
-            ),
-            child: const Center(
-              child: Icon(Icons.location_pin, color: AppColors.gold, size: 44),
-            ),
-          ),
-          const SizedBox(height: 16),
-          LuxuryButton(
-            label: 'Mark as Completed',
-            icon: Icons.check_circle_outline,
-            onPressed: () => _goToStep(5),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompleted() {
-    return WhitePremiumCard(
-      child: Column(
-        children: [
-          const _SuccessIcon(icon: Icons.check_rounded),
-          const SizedBox(height: 18),
-          Text(
-            'Request Completed',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppColors.success,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'The issue has been resolved successfully.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 18),
-          const Row(
-            children: [
-              Expanded(child: _BeforeAfterBox(label: 'Before')),
-              SizedBox(width: 10),
-              Expanded(child: _BeforeAfterBox(label: 'After')),
-            ],
-          ),
-          const SizedBox(height: 18),
-          const _DetailPanel(
-            rows: [
-              ('Completed By', ServiceRequestDummy.technicianName),
-              ('Completed At', '22 Jun 2026, 11:25 AM'),
-              ('Note', 'Leakage issue has been fixed and tested successfully.'),
-            ],
-          ),
-          const SizedBox(height: 18),
-          LuxuryButton(
-            label: 'Close Request',
-            icon: Icons.star_outline,
-            onPressed: () => _goToStep(6),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRateService() {
-    return WhitePremiumCard(
-      child: Column(
-        children: [
-          const _CardTitle(
-            title: 'Rate Service',
-            subtitle: 'How was your experience with our service?',
-            icon: Icons.star_outline,
+            title: 'Tracking Detail',
+            subtitle: 'Real-time status and service ticket information.',
+            icon: Icons.track_changes_outlined,
           ),
           const SizedBox(height: 18),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              for (var i = 1; i <= 5; i++)
-                IconButton(
-                  onPressed: () => setState(() => _rating = i),
-                  icon: Icon(
-                    i <= _rating ? Icons.star : Icons.star_border,
-                    color: AppColors.gold,
-                    size: 30,
+              Expanded(
+                child: Text(
+                  ticket.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
+              ),
+              const SizedBox(width: 12),
+              ServiceStatusBadge(status: ticket.status),
             ],
           ),
+          const SizedBox(height: 12),
           Text(
-            _rating >= 5 ? 'Excellent!' : 'Thank you!',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            ticket.description.isEmpty ? '-' : ticket.description,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(height: 1.45),
+          ),
+          const SizedBox(height: 18),
+          _DetailPanel(
+            rows: [
+              ('Ticket Number', ticket.ticketNumber),
+              ('Category', ticket.category.displayLabel),
+              ('Subcategory', ticket.subcategory.displayLabel),
+              ('Priority', ticket.priority),
+              (
+                'Assigned To',
+                ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo,
+              ),
+              ('Created At', _formatDateTime(ticket.createdAt)),
+              (
+                'Operational Time',
+                ticket.operationalTimestamp.isEmpty
+                    ? '-'
+                    : _formatDateTime(ticket.operationalTimestamp),
+              ),
+              (
+                'SLA Due',
+                ticket.slaDueAt.isEmpty
+                    ? '-'
+                    : _formatDateTime(ticket.slaDueAt),
+              ),
+              ('SLA State', ticket.slaState.isEmpty ? '-' : ticket.slaState),
+              (
+                'Completed At',
+                ticket.completedAt.isEmpty
+                    ? '-'
+                    : _formatDateTime(ticket.completedAt),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Attachments',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: AppColors.navy,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _commentController,
-            minLines: 4,
-            maxLines: 5,
-            decoration: const InputDecoration(labelText: 'Add comment'),
+          const SizedBox(height: 10),
+          ServiceAttachmentSection(
+            attachments: ticket.attachments,
+            emptyMessage: 'No file attachments',
+            onPreviewTap: _showAttachmentPreview,
           ),
           const SizedBox(height: 16),
+          Text(
+            'Timeline',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (ticket.timeline.isEmpty)
+            const _EmptyStateText(text: 'No timeline updates available yet.')
+          else
+            for (final item in ticket.timeline)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _TimelineCard(item: item),
+              ),
+          const SizedBox(height: 18),
           LuxuryButton(
-            label: 'Submit Rating',
-            icon: Icons.send_outlined,
-            onPressed: _submitRating,
+            label: 'View History',
+            icon: Icons.history_outlined,
+            onPressed: () => _loadHistory(openHistory: true),
           ),
         ],
       ),
@@ -525,6 +826,17 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildTicketHistory() {
+    if (_isLoadingHistory) {
+      return const _LoadingStateCard(message: 'Loading service history...');
+    }
+
+    if (_tickets.isEmpty && _errorMessage != null) {
+      return _ErrorStateCard(
+        message: _errorMessage!,
+        onRetry: () => _loadHistory(openHistory: true),
+      );
+    }
+
     final tickets = _filteredTickets;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,7 +852,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               ),
               const SizedBox(height: 16),
               _ChoiceWrap(
-                items: ServiceRequestDummy.historyFilters,
+                items: _historyFilters,
                 selected: _historyFilter,
                 onSelected: (value) => setState(() => _historyFilter = value),
               ),
@@ -548,21 +860,31 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           ),
         ),
         const SizedBox(height: 14),
+        if (tickets.isEmpty)
+          const WhitePremiumCard(
+            child: _EmptyStateText(
+              text: 'No service requests found for this filter.',
+            ),
+          ),
         for (final ticket in tickets)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: WhitePremiumCard(
+              onTap: () => _openTicketDetail(ticket),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _GoldIcon(icon: _categoryIcon(ticket.category), size: 44),
+                  _GoldIcon(
+                    icon: _categoryIcon(ticket.category.displayLabel),
+                    size: 44,
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${ticket.id} - ${ticket.title}',
+                          '${ticket.ticketNumber} - ${ticket.title}',
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(
                                 color: AppColors.navy,
@@ -570,20 +892,29 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                               ),
                         ),
                         const SizedBox(height: 4),
-                        Text('${ticket.category} - ${ticket.priority}'),
-                        const SizedBox(height: 8),
                         Text(
-                          _dateTimeFormat.format(ticket.createdAt),
+                          '${ticket.category.displayLabel} • ${ticket.subcategory.displayLabel}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Assignee: ${ticket.assignee}',
+                          '${ticket.priority} • ${ticket.slaState.isEmpty ? 'SLA not available' : ticket.slaState}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _formatDateTime(ticket.createdAt),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Assigned to: ${ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 12),
                   ServiceStatusBadge(status: ticket.status),
                 ],
               ),
@@ -594,6 +925,338 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           child: const Text('Back to Services'),
         ),
       ],
+    );
+  }
+
+  void _showTicketDetailSheet(ServiceTicketRecord ticket) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: WhitePremiumCard(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _GoldIcon(
+                          icon: _categoryIcon(ticket.category.displayLabel),
+                          size: 42,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ticket.title,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ServiceStatusBadge(status: ticket.status),
+                                  _StaticPill(label: ticket.priority),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      ticket.description.isEmpty ? '-' : ticket.description,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(height: 1.45),
+                    ),
+                    const SizedBox(height: 16),
+                    _DetailPanel(
+                      rows: [
+                        ('Ticket Number', ticket.ticketNumber),
+                        ('Category', ticket.category.displayLabel),
+                        ('Subcategory', ticket.subcategory.displayLabel),
+                        (
+                          'Assigned To',
+                          ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo,
+                        ),
+                        ('Created At', _formatDateTime(ticket.createdAt)),
+                        (
+                          'Operational Time',
+                          ticket.operationalTimestamp.isEmpty
+                              ? '-'
+                              : _formatDateTime(ticket.operationalTimestamp),
+                        ),
+                        (
+                          'SLA Due',
+                          ticket.slaDueAt.isEmpty
+                              ? '-'
+                              : _formatDateTime(ticket.slaDueAt),
+                        ),
+                        (
+                          'SLA State',
+                          ticket.slaState.isEmpty ? '-' : ticket.slaState,
+                        ),
+                        (
+                          'Completed At',
+                          ticket.completedAt.isEmpty
+                              ? '-'
+                              : _formatDateTime(ticket.completedAt),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Attachments',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ServiceAttachmentSection(
+                      attachments: ticket.attachments,
+                      onPreviewTap: _showAttachmentPreview,
+                    ),
+                    const SizedBox(height: 16),
+                    LuxuryButton(
+                      label: 'Close',
+                      icon: Icons.check_rounded,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAttachmentPreview(ServiceAttachment attachment) {
+    return showServiceAttachmentPreview(context, attachment);
+  }
+
+  String _formatDateTime(String raw) {
+    if (raw.isEmpty) {
+      return '-';
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) {
+      return raw;
+    }
+    return _dateTimeFormat.format(parsed.toLocal());
+  }
+
+  String _slaLabel(ServiceSla sla) {
+    final parts = <String>[];
+    if (sla.low > 0) {
+      parts.add('Low ${sla.low}m');
+    }
+    if (sla.medium > 0) {
+      parts.add('Medium ${sla.medium}m');
+    }
+    if (sla.high > 0) {
+      parts.add('High ${sla.high}m');
+    }
+    if (sla.emergency > 0) {
+      parts.add('Emergency ${sla.emergency}m');
+    }
+    return parts.isEmpty ? 'SLA not available' : parts.join(' • ');
+  }
+}
+
+class _LoadingStateCard extends StatelessWidget {
+  const _LoadingStateCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorStateCard extends StatelessWidget {
+  const _ErrorStateCard({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.warning,
+            size: 36,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          LuxuryButton(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyStateText extends StatelessWidget {
+  const _EmptyStateText({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+    );
+  }
+}
+
+class _TimelineCard extends StatelessWidget {
+  const _TimelineCard({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = _readTimelinePrimary(item);
+    final secondary = _readTimelineSecondary(item);
+    return WhitePremiumCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _GoldIcon(icon: Icons.timeline_rounded, size: 36),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  primary,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (secondary.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    secondary,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaticPill extends StatelessWidget {
+  const _StaticPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.goldSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.20)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.navy,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryStateButton extends StatelessWidget {
+  const _PrimaryStateButton({
+    this.buttonKey,
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final Key? buttonKey;
+  final String label;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AbsorbPointer(
+      absorbing: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.56,
+        child: LuxuryButton(
+          key: buttonKey,
+          label: label,
+          icon: Icons.arrow_forward_rounded,
+          onPressed: onPressed,
+        ),
+      ),
     );
   }
 }
@@ -694,128 +1357,183 @@ class _CardTitle extends StatelessWidget {
 }
 
 class _PhotoUploadRow extends StatelessWidget {
-  const _PhotoUploadRow();
+  const _PhotoUploadRow({
+    required this.attachmentPaths,
+    required this.onAddTap,
+    required this.onRemove,
+  });
+
+  final List<String> attachmentPaths;
+  final VoidCallback onAddTap;
+  final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < 3; i++) ...[
-          Expanded(
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.borderSoft),
-                ),
-                child: Icon(
-                  Icons.image_outlined,
-                  color: AppColors.gold.withValues(alpha: 0.72),
-                ),
-              ),
-            ),
+        Text(
+          'Attachments',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: AppColors.navy,
+            fontWeight: FontWeight.w900,
           ),
-          const SizedBox(width: 8),
-        ],
-        Expanded(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.borderSoft),
-              ),
-              child: const Icon(Icons.add, color: AppColors.gold),
-            ),
-          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Optional photos to help the service team understand the issue faster.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 10.0;
+            final itemWidth = (constraints.maxWidth - (spacing * 2)) / 3;
+            final children = <Widget>[
+              for (var index = 0; index < attachmentPaths.length; index++)
+                SizedBox(
+                  width: itemWidth,
+                  child: _AttachmentPreviewCard(
+                    path: attachmentPaths[index],
+                    removeKey: ValueKey('attachment-remove-$index'),
+                    onRemove: () => onRemove(attachmentPaths[index]),
+                  ),
+                ),
+              if (attachmentPaths.length < 3)
+                SizedBox(
+                  width: itemWidth,
+                  child: _AttachmentAddCard(onTap: onAddTap),
+                ),
+            ];
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: children,
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _ProgressTimeline extends StatelessWidget {
-  const _ProgressTimeline({required this.activeIndex});
+class _AttachmentPreviewCard extends StatelessWidget {
+  const _AttachmentPreviewCard({
+    required this.path,
+    required this.removeKey,
+    required this.onRemove,
+  });
 
-  final int activeIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    const steps = ['Inspection', 'Repairing', 'Quality Check', 'Completed'];
-    return Column(
-      children: [
-        for (var i = 0; i < steps.length; i++)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                children: [
-                  Icon(
-                    i <= activeIndex
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    color: i <= activeIndex
-                        ? AppColors.gold
-                        : AppColors.textMuted,
-                    size: 22,
-                  ),
-                  if (i != steps.length - 1)
-                    Container(
-                      width: 1,
-                      height: 28,
-                      color: AppColors.borderSoft,
-                    ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    steps[i],
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: i == activeIndex
-                          ? AppColors.navy
-                          : AppColors.textMuted,
-                      fontWeight: i == activeIndex
-                          ? FontWeight.w900
-                          : FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-}
-
-class _BeforeAfterBox extends StatelessWidget {
-  const _BeforeAfterBox({required this.label});
-
-  final String label;
+  final String path;
+  final Key removeKey;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 1.12,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceMuted,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.navy,
-              fontWeight: FontWeight.w900,
+      aspectRatio: 1,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                color: AppColors.surfaceMuted,
+                child: Image.file(
+                  File(path),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_outlined,
+                          color: AppColors.gold.withValues(alpha: 0.82),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            _attachmentLabel(path),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
             ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.96),
+              shape: const CircleBorder(),
+              child: InkWell(
+                key: removeKey,
+                customBorder: const CircleBorder(),
+                onTap: onRemove,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: AppColors.navy,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentAddCard extends StatelessWidget {
+  const _AttachmentAddCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const ValueKey('attachment-add-button'),
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.add_a_photo_outlined, color: AppColors.gold),
+              const SizedBox(height: 8),
+              Text(
+                'Add photo',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -897,6 +1615,95 @@ class _InfoPanel extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           ServiceStatusBadge(status: status),
+        ],
+      ),
+    );
+  }
+}
+
+class _AutomaticScheduleNotice extends StatelessWidget {
+  const _AutomaticScheduleNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _GoldIcon(icon: Icons.schedule_outlined, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Schedule is set automatically',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Visit date and service time are arranged by management/backend, so residents only need to add notes if there is a preferred timing request.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentSourceTile extends StatelessWidget {
+  const _AttachmentSourceTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      onTap: onTap,
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          _GoldIcon(icon: icon, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.gold),
         ],
       ),
     );
@@ -1077,6 +1884,40 @@ class _GoldIcon extends StatelessWidget {
   }
 }
 
+String _readTimelinePrimary(Map<String, dynamic> item) {
+  final status = '${item['status'] ?? ''}'.trim();
+  final title = '${item['title'] ?? ''}'.trim();
+  final note = '${item['note'] ?? ''}'.trim();
+  if (status.isNotEmpty) {
+    return status;
+  }
+  if (title.isNotEmpty) {
+    return title;
+  }
+  if (note.isNotEmpty) {
+    return note;
+  }
+  return 'Timeline Update';
+}
+
+String _readTimelineSecondary(Map<String, dynamic> item) {
+  final parts = <String>[
+    '${item['description'] ?? ''}'.trim(),
+    '${item['created_at'] ?? item['timestamp'] ?? ''}'.trim(),
+  ].where((value) => value.isNotEmpty).toList();
+  return parts.join(' • ');
+}
+
+String _attachmentLabel(String path) {
+  final parts = path.split(RegExp(r'[\\/]'));
+  if (parts.isEmpty) {
+    return path;
+  }
+
+  final label = parts.last.trim();
+  return label.isEmpty ? path : label;
+}
+
 IconData _categoryIcon(String category) {
   return switch (category) {
     'Plumbing' => Icons.plumbing_outlined,
@@ -1084,6 +1925,7 @@ IconData _categoryIcon(String category) {
     'Air Conditioning' => Icons.ac_unit_outlined,
     'Housekeeping' => Icons.cleaning_services_outlined,
     'Internet / Wi-Fi' => Icons.wifi_outlined,
+    'General Maintenance' => Icons.handyman_outlined,
     _ => Icons.handyman_outlined,
   };
 }

@@ -6,6 +6,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../models/community_announcement_models.dart';
+import '../../../models/resident_user.dart';
+import '../../../services/api_service.dart';
+import '../community/widgets/community_announcement_presentation.dart';
 
 final _currency = NumberFormat.currency(
   locale: 'id_ID',
@@ -13,33 +17,149 @@ final _currency = NumberFormat.currency(
   decimalDigits: 0,
 );
 
-class ResidentHomePage extends StatelessWidget {
-  const ResidentHomePage({super.key, required this.onNavigate});
+class ResidentHomePage extends StatefulWidget {
+  const ResidentHomePage({
+    super.key,
+    this.resident,
+    this.apiService,
+    required this.onNavigate,
+    required this.onOpenBilling,
+  });
 
+  final ResidentUser? resident;
+  final ApiService? apiService;
   final ValueChanged<int> onNavigate;
+  final VoidCallback onOpenBilling;
+
+  @override
+  State<ResidentHomePage> createState() => _ResidentHomePageState();
+}
+
+class _ResidentHomePageState extends State<ResidentHomePage> {
+  late final ApiService _apiService = widget.apiService ?? ApiService();
+
+  List<CommunityAnnouncement> _highlights = [];
+  bool _isLoadingHighlights = false;
+  String? _highlightsError;
+  CommunityAnnouncement? _selectedAnnouncement;
+  bool _isLoadingDetail = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHighlights();
+  }
+
+  Future<void> _loadHighlights() async {
+    setState(() {
+      _isLoadingHighlights = true;
+      _highlightsError = null;
+    });
+
+    try {
+      final announcements = await _apiService.getResidentAnnouncements();
+      if (!mounted) {
+        return;
+      }
+
+      final sorted = List<CommunityAnnouncement>.of(announcements)
+        ..sort(_sortHighlights);
+      setState(() {
+        _highlights = sorted.take(3).toList();
+        _isLoadingHighlights = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final message = error is ApiServiceException
+          ? error.message
+          : 'Pengumuman belum bisa dimuat. Coba lagi.';
+      setState(() {
+        _highlightsError = message;
+        _isLoadingHighlights = false;
+      });
+    }
+  }
+
+  Future<void> _openHighlightDetail(CommunityAnnouncement announcement) async {
+    setState(() {
+      _selectedAnnouncement = announcement;
+      _isLoadingDetail = true;
+    });
+
+    await showCommunityAnnouncementDetailSheet(
+      context: context,
+      initialAnnouncement: announcement,
+      apiService: _apiService,
+      onLoaded: (detail) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _selectedAnnouncement = detail;
+          _isLoadingDetail = false;
+        });
+      },
+      onLoadingFinished: () {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() => _isLoadingDetail = false);
+      },
+      onError: (_) {},
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedAnnouncement = null;
+      _isLoadingDetail = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final residentName = _displayName(widget.resident);
+    final towerValue = _rawTowerValue(widget.resident?.unit);
+    final unitValue = _rawUnitValue(widget.resident?.unit);
+    final residentTypeValue = _rawResidentTypeValue(widget.resident);
+    final towerLabel = _towerLabel(widget.resident?.unit);
+    final unitLabel = _unitLabel(widget.resident?.unit);
+    final residentTypeLabel = _residentTypeLabel(widget.resident);
+    final contractLabel = _contractLabel(widget.resident);
+    final selectedAnnouncementId = _selectedAnnouncement?.id;
+    final summaryItems = [
+      _SummaryData(label: 'Tower', value: towerLabel),
+      _SummaryData(label: 'Unit', value: unitLabel),
+      _SummaryData(label: 'Resident Type', value: residentTypeLabel),
+      _SummaryData(label: 'Contract End', value: contractLabel),
+    ];
     final quickActions = [
       _QuickAction(
         icon: Icons.qr_code_2_rounded,
         label: 'Visitor Pass',
-        onTap: () => onNavigate(1),
+        onTap: () => widget.onNavigate(1),
       ),
       _QuickAction(
         icon: Icons.person_rounded,
         label: 'Profile',
-        onTap: () => onNavigate(4),
+        onTap: () => widget.onNavigate(4),
       ),
       _QuickAction(
         icon: Icons.handyman_rounded,
         label: 'Service',
-        onTap: () => onNavigate(2),
+        onTap: () => widget.onNavigate(2),
       ),
       _QuickAction(
         icon: Icons.groups_rounded,
         label: 'Community',
-        onTap: () => onNavigate(3),
+        onTap: () => widget.onNavigate(3),
       ),
     ];
 
@@ -50,101 +170,14 @@ class ResidentHomePage extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 128),
         children: [
           _HeroHeaderStack(
-            onBillingTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Billing is currently unavailable in this package.',
-                  ),
-                ),
-              );
-            },
+            residentName: residentName,
+            residentTypeLabel: residentTypeValue,
+            towerLabel: towerValue,
+            unitLabel: unitValue,
+            onBillingTap: widget.onOpenBilling,
           ).animate().fadeIn(duration: 360.ms).moveY(begin: 18, end: 0),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-            child: Column(
-              children: [
-                const SectionHeader(
-                  title: 'Quick Access',
-                  actionLabel: 'Resident tools',
-                ),
-                const SizedBox(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const spacing = 12.0;
-
-                    return GridView.count(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: spacing,
-                      crossAxisSpacing: spacing,
-                      childAspectRatio: 1.65,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        for (final action in quickActions)
-                          _QuickAccessCard(action: action),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-            child: WhitePremiumCard(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: const [
-                  _SummaryItem(label: 'Tower', value: 'Asteria'),
-                  _SummaryItem(label: 'Unit', value: 'A-1808'),
-                  _SummaryItem(label: 'Access', value: '3 active passes'),
-                  _SummaryItem(label: 'Packages', value: '2 waiting pickup'),
-                ],
-              ),
-            ),
-          ).animate().fadeIn(duration: 420.ms).moveY(begin: 24, end: 0),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
-              children: [
-                const SectionHeader(
-                  title: 'Today Highlights',
-                  actionLabel: 'Curated',
-                ),
-                const SizedBox(height: 14),
-                _ActivityCard(
-                  icon: Icons.calendar_today_rounded,
-                  eyebrow: 'Facility Booking',
-                  title: 'Sky Lounge reserved tonight',
-                  detail: 'Friday, 19 June 2026 • 19:00 - 21:00',
-                  accent: AppColors.info,
-                  actionLabel: 'View booking',
-                ),
-                const SizedBox(height: 12),
-                _ActivityCard(
-                  icon: Icons.inventory_2_rounded,
-                  eyebrow: 'Concierge Update',
-                  title: '2 packages ready at lobby desk',
-                  detail: 'Pickup before 22:00 with resident QR verification.',
-                  accent: AppColors.gold,
-                  actionLabel: 'Open access',
-                ),
-                const SizedBox(height: 12),
-                _ActivityCard(
-                  icon: Icons.campaign_rounded,
-                  eyebrow: 'Community Notice',
-                  title: 'Weekend acoustic evening at rooftop garden',
-                  detail: 'Reserve seats early from the community tab.',
-                  accent: AppColors.success,
-                  actionLabel: 'See details',
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: WhitePremiumCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,22 +218,107 @@ class ResidentHomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   LuxuryButton(
-                    label: 'Billing unavailable',
+                    key: const ValueKey('current-balance-billing-button'),
+                    label: 'Open Billing',
                     icon: Icons.arrow_forward_rounded,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Billing is currently unavailable in this package.',
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: widget.onOpenBilling,
                   ),
                 ],
               ),
             ),
           ).animate().fadeIn(duration: 480.ms).moveY(begin: 28, end: 0),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              children: [
+                const SectionHeader(
+                  title: 'Quick Access',
+                  actionLabel: 'Resident tools',
+                ),
+                const SizedBox(height: 14),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const spacing = 12.0;
+
+                    return GridView.count(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: spacing,
+                      crossAxisSpacing: spacing,
+                      childAspectRatio: 1.65,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        for (final action in quickActions)
+                          _QuickAccessCard(action: action),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            child: WhitePremiumCard(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final item in summaryItems)
+                    _SummaryItem(label: item.label, value: item.value),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(duration: 420.ms).moveY(begin: 24, end: 0),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              children: [
+                const SectionHeader(
+                  title: 'Today Highlights',
+                  actionLabel: 'Curated',
+                ),
+                const SizedBox(height: 14),
+                if (_isLoadingHighlights)
+                  const _HighlightsLoadingCard()
+                else if (_highlightsError != null)
+                  _HighlightsErrorCard(
+                    message: _highlightsError!,
+                    onRetry: _loadHighlights,
+                  )
+                else if (_highlights.isEmpty)
+                  const _HighlightsEmptyCard()
+                else
+                  for (var index = 0; index < _highlights.length; index++) ...[
+                    _ActivityCard(
+                      icon: communityAnnouncementIconFor(_highlights[index]),
+                      eyebrow: communityAnnouncementCategoryLabel(
+                        _highlights[index].category,
+                      ),
+                      title: _highlights[index].title.isEmpty
+                          ? 'Management update'
+                          : _highlights[index].title,
+                      detail: communityAnnouncementPreviewContent(
+                        _highlights[index].content,
+                        maxLength: 120,
+                      ),
+                      accent: communityAnnouncementAccentColor(
+                        _highlights[index],
+                      ),
+                      actionLabel: communityAnnouncementPrimaryBadgeLabel(
+                        _highlights[index],
+                      ),
+                      isSelected:
+                          _isLoadingDetail &&
+                          selectedAnnouncementId == _highlights[index].id,
+                      onTap: () => _openHighlightDetail(_highlights[index]),
+                    ),
+                    if (index < _highlights.length - 1)
+                      const SizedBox(height: 12),
+                  ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -208,8 +326,18 @@ class ResidentHomePage extends StatelessWidget {
 }
 
 class _HeroHeaderStack extends StatelessWidget {
-  const _HeroHeaderStack({required this.onBillingTap});
+  const _HeroHeaderStack({
+    required this.residentName,
+    required this.residentTypeLabel,
+    required this.towerLabel,
+    required this.unitLabel,
+    required this.onBillingTap,
+  });
 
+  final String residentName;
+  final String residentTypeLabel;
+  final String towerLabel;
+  final String unitLabel;
   final VoidCallback onBillingTap;
 
   @override
@@ -219,7 +347,12 @@ class _HeroHeaderStack extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const _HeroHeader(),
+          _HeroHeader(
+            residentName: residentName,
+            residentTypeLabel: residentTypeLabel,
+            towerLabel: towerLabel,
+            unitLabel: unitLabel,
+          ),
           const Positioned(
             left: 0,
             right: 0,
@@ -240,10 +373,26 @@ class _HeroHeaderStack extends StatelessWidget {
 }
 
 class _HeroHeader extends StatelessWidget {
-  const _HeroHeader();
+  const _HeroHeader({
+    required this.residentName,
+    required this.residentTypeLabel,
+    required this.towerLabel,
+    required this.unitLabel,
+  });
+
+  final String residentName;
+  final String residentTypeLabel;
+  final String towerLabel;
+  final String unitLabel;
 
   @override
   Widget build(BuildContext context) {
+    final heroBadges = [
+      if (towerLabel.isNotEmpty) 'Tower $towerLabel',
+      if (unitLabel.isNotEmpty) 'Unit $unitLabel',
+      if (residentTypeLabel.isNotEmpty) residentTypeLabel,
+    ];
+
     return Container(
       width: double.infinity,
       height: 306,
@@ -267,7 +416,9 @@ class _HeroHeader extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Good Evening, Nadia',
+                        residentName.isEmpty
+                            ? 'Good Evening'
+                            : 'Good Evening, $residentName',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.headlineMedium
@@ -296,15 +447,14 @@ class _HeroHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: const [
-                _HeroBadge(label: 'Tower Asteria'),
-                _HeroBadge(label: 'Unit A-1808'),
-                _HeroBadge(label: 'Resident since 2024'),
-              ],
-            ),
+            if (heroBadges.isNotEmpty)
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final badge in heroBadges) _HeroBadge(label: badge),
+                ],
+              ),
           ],
         ),
       ),
@@ -366,6 +516,7 @@ class _MonthlyBillingCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           LuxuryButton(
+            key: const ValueKey('monthly-billing-button'),
             label: 'Pay now',
             fullWidth: false,
             onPressed: onBillingTap,
@@ -484,6 +635,82 @@ class _SummaryItem extends StatelessWidget {
   }
 }
 
+class _SummaryData {
+  const _SummaryData({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+String _displayName(ResidentUser? resident) {
+  final name = resident?.name.trim() ?? '';
+  return name.isEmpty ? '' : name;
+}
+
+String _rawTowerValue(ResidentUnit? unit) {
+  return unit?.tower.trim() ?? '';
+}
+
+String _rawUnitValue(ResidentUnit? unit) {
+  return unit?.code.trim() ?? '';
+}
+
+String _rawResidentTypeValue(ResidentUser? resident) {
+  return resident?.residentType.trim() ?? '';
+}
+
+String _towerLabel(ResidentUnit? unit) {
+  final tower = _rawTowerValue(unit);
+  return tower.isEmpty ? 'Assigned after activation' : tower;
+}
+
+String _unitLabel(ResidentUnit? unit) {
+  final code = _rawUnitValue(unit);
+  return code.isEmpty ? 'Pending assignment' : code;
+}
+
+String _residentTypeLabel(ResidentUser? resident) {
+  final type = _rawResidentTypeValue(resident);
+  return type.isEmpty ? 'Resident account' : type;
+}
+
+String _contractLabel(ResidentUser? resident) {
+  final contractEndDate = resident?.contractEndDate.trim() ?? '';
+  if (contractEndDate.isEmpty) {
+    return 'Not available';
+  }
+
+  final parsedDate = DateTime.tryParse(contractEndDate);
+  if (parsedDate == null) {
+    return contractEndDate;
+  }
+
+  return DateFormat('d MMM yyyy', 'id_ID').format(parsedDate);
+}
+
+int _sortHighlights(CommunityAnnouncement left, CommunityAnnouncement right) {
+  if (left.isPinned != right.isPinned) {
+    return left.isPinned ? -1 : 1;
+  }
+
+  final rightDate = DateTime.tryParse(right.publishedAt);
+  final leftDate = DateTime.tryParse(left.publishedAt);
+
+  if (leftDate == null && rightDate == null) {
+    return 0;
+  }
+
+  if (leftDate == null) {
+    return 1;
+  }
+
+  if (rightDate == null) {
+    return -1;
+  }
+
+  return rightDate.compareTo(leftDate);
+}
+
 class _ActivityCard extends StatelessWidget {
   const _ActivityCard({
     required this.icon,
@@ -492,6 +719,8 @@ class _ActivityCard extends StatelessWidget {
     required this.detail,
     required this.accent,
     required this.actionLabel,
+    this.isSelected = false,
+    this.onTap,
   });
 
   final IconData icon;
@@ -500,10 +729,14 @@ class _ActivityCard extends StatelessWidget {
   final String detail;
   final Color accent;
   final String actionLabel;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final chipColor = isSelected ? AppColors.gold : accent;
     return WhitePremiumCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -529,8 +762,8 @@ class _ActivityCard extends StatelessWidget {
               ),
               _InfoChip(
                 label: actionLabel,
-                color: accent,
-                background: accent.withValues(alpha: 0.10),
+                color: chipColor,
+                background: chipColor.withValues(alpha: 0.10),
               ),
             ],
           ),
@@ -543,6 +776,110 @@ class _ActivityCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(detail, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightsLoadingCard extends StatelessWidget {
+  const _HighlightsLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Loading highlights...',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Curating the latest management announcements for your home dashboard.',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightsErrorCard extends StatelessWidget {
+  const _HighlightsErrorCard({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const _GoldIcon(
+            icon: Icons.error_outline_rounded,
+            size: 52,
+            iconSize: 24,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          LuxuryButton(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightsEmptyCard extends StatelessWidget {
+  const _HighlightsEmptyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const _GoldIcon(
+            icon: Icons.notifications_paused_outlined,
+            size: 52,
+            iconSize: 24,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'No highlights available yet.',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Fresh announcements from the management office will appear here.',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -612,17 +949,17 @@ class _HeroBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: Colors.white,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

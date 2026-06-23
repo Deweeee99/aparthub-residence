@@ -4,23 +4,73 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/luxury_background.dart';
+import '../../services/api_service.dart';
+import '../../services/app_debug_logger.dart';
+import '../../services/auth_storage_service.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({
+    super.key,
+    this.apiService,
+    this.authStorageService,
+    this.delay = const Duration(milliseconds: 1800),
+  });
+
+  final ApiService? apiService;
+  final AuthStorageService? authStorageService;
+  final Duration delay;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  late final AuthStorageService _authStorageService =
+      widget.authStorageService ?? AuthStorageService();
+  late final ApiService _apiService =
+      widget.apiService ?? ApiService(authStorageService: _authStorageService);
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1800), () {
-      if (mounted) {
-        context.go('/login');
+    _resolveSession();
+  }
+
+  Future<void> _resolveSession() async {
+    await Future.delayed(widget.delay);
+
+    final token = await _authStorageService.getToken();
+    appDebugLog(
+      'Splash',
+      token == null || token.isEmpty
+          ? 'No stored token found'
+          : 'Stored token found ${maskToken(token)}',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (token == null || token.isEmpty) {
+      context.go('/login');
+      return;
+    }
+
+    try {
+      await _apiService.getResidentMe();
+      if (!mounted) {
+        return;
       }
-    });
+      appDebugLog('Splash', 'Resident session valid, opening dashboard');
+      context.go('/resident');
+    } catch (_) {
+      appDebugLog('Splash', 'Resident session invalid, clearing local session');
+      await _authStorageService.clearSession();
+      if (!mounted) {
+        return;
+      }
+      context.go('/login');
+    }
   }
 
   @override

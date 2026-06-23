@@ -17,7 +17,7 @@ class ServiceStepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 64,
+      height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: steps.length,
@@ -80,7 +80,7 @@ class _StepNode extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
       child: SizedBox(
-        width: 82,
+        width: 92,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -105,8 +105,9 @@ class _StepNode extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               label,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: isActive ? AppColors.textPrimary : AppColors.textMuted,
                 fontWeight: FontWeight.w900,

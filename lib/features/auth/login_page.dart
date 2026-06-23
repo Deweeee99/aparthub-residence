@@ -6,41 +6,81 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/luxury_background.dart';
 import '../../core/widgets/luxury_button.dart';
-import '../../data/data_dummy/user_data_dummy.dart';
+import '../../services/api_service.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.apiService});
+
+  final ApiService? apiService;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _usernameController = TextEditingController();
+  late final ApiService _apiService = widget.apiService ?? ApiService();
+  final _loginController = TextEditingController();
   final _passwordController = TextEditingController();
   var _isPasswordVisible = false;
+  var _isLoading = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _loginController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() {
-    final inputUsername = _usernameController.text.trim().toLowerCase();
+  Future<void> _handleLogin() async {
+    if (_isLoading) {
+      return;
+    }
+
+    final inputLogin = _loginController.text.trim();
     final inputPassword = _passwordController.text;
 
-    try {
-      final user = UserDataDummy.users.firstWhere(
-        (user) =>
-            user.username == inputUsername && user.password == inputPassword,
-      );
-      context.go(user.route);
-    } catch (_) {
+    if (inputLogin.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Username atau password belum sesuai.')),
+        const SnackBar(content: Text('Login tidak boleh kosong.')),
       );
+      return;
+    }
+
+    if (inputPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password tidak boleh kosong.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _apiService.loginResident(
+        login: inputLogin,
+        password: inputPassword,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      context.go('/resident');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final message = error is ApiServiceException
+          ? error.message
+          : 'Login gagal. Periksa kembali akun dan password Anda.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -104,7 +144,7 @@ class _LoginPageState extends State<LoginPage> {
               ).animate().fadeIn(delay: 100.ms).moveY(begin: 10, end: 0),
               const SizedBox(height: 8),
               Text(
-                'Login with your resident dummy account to continue.',
+                'Login with your registered resident account to continue.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ).animate().fadeIn(delay: 180.ms).moveY(begin: 10, end: 0),
               const SizedBox(height: 30),
@@ -114,14 +154,14 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _InputLabel(text: 'Username'),
+                    _InputLabel(text: 'Login'),
                     const SizedBox(height: 8),
                     TextField(
                       key: const ValueKey('username-field'),
-                      controller: _usernameController,
+                      controller: _loginController,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        hintText: 'resident',
+                        hintText: 'Email or mobile number',
                         prefixIcon: Icon(Icons.person_outline_rounded),
                       ),
                     ),
@@ -134,7 +174,7 @@ class _LoginPageState extends State<LoginPage> {
                       obscureText: !_isPasswordVisible,
                       onSubmitted: (_) => _handleLogin(),
                       decoration: InputDecoration(
-                        hintText: 'password123',
+                        hintText: 'Enter your password',
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
                           tooltip: _isPasswordVisible
@@ -154,17 +194,28 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    LuxuryButton(
-                      label: 'Login to Dashboard',
-                      icon: Icons.login_rounded,
-                      onPressed: _handleLogin,
+                    AbsorbPointer(
+                      absorbing: _isLoading,
+                      child: Opacity(
+                        opacity: _isLoading ? 0.72 : 1,
+                        child: LuxuryButton(
+                          key: const ValueKey('login-button'),
+                          label: _isLoading
+                              ? 'Signing In...'
+                              : 'Login to Dashboard',
+                          icon: _isLoading
+                              ? Icons.hourglass_top_rounded
+                              : Icons.login_rounded,
+                          onPressed: _handleLogin,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ).animate().fadeIn(delay: 260.ms).moveY(begin: 20, end: 0),
               const SizedBox(height: 18),
               Text(
-                'Dummy account: resident / password123',
+                'Your resident session is validated securely before access is granted.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textMuted,

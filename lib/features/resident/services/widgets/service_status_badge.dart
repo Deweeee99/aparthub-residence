@@ -9,12 +9,18 @@ class ServiceStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
+    final normalizedStatus = status.trim();
+    final color = switch (normalizedStatus) {
+      'Submitted' => AppColors.info,
       'Open' => AppColors.info,
       'Assigned' => AppColors.warning,
+      'In Progress' => AppColors.gold,
       'Progress' => AppColors.gold,
+      'Completed' => AppColors.success,
       'Done' => AppColors.success,
       'Emergency' => AppColors.danger,
+      'Over SLA' => AppColors.danger,
+      'Cancelled' => AppColors.textMuted,
       _ => AppColors.textSecondary,
     };
 
@@ -26,7 +32,7 @@ class ServiceStatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
-        status,
+        normalizedStatus,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: color,
           fontWeight: FontWeight.w900,

@@ -12,7 +12,9 @@ final _currency = NumberFormat.currency(
 );
 
 class BillingPage extends StatelessWidget {
-  const BillingPage({super.key});
+  const BillingPage({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -20,11 +22,26 @@ class BillingPage extends StatelessWidget {
       key: const ValueKey('billing-page'),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 128),
       children: [
-        Text(
-          'Billing',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
+        Row(
+          children: [
+            if (onBack != null) ...[
+              IconButton(
+                key: const ValueKey('billing-back-button'),
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'Back',
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(
+                'Billing',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         Text(

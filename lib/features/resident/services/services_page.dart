@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/white_premium_card.dart';
-import '../../../data/data_dummy/service_request_dummy.dart';
+import '../../../services/api_service.dart';
 import 'service_request_page.dart';
 
 enum _ServiceSubview { hub, request, history }
 
 class ServicesPage extends StatefulWidget {
-  const ServicesPage({super.key});
+  const ServicesPage({super.key, this.apiService});
+
+  final ApiService? apiService;
 
   @override
   State<ServicesPage> createState() => _ServicesPageState();
@@ -34,11 +36,13 @@ class _ServicesPageState extends State<ServicesPage> {
           key: const ValueKey('service-request-flow'),
           onBack: _backToHub,
           initialMode: ServiceRequestInitialMode.create,
+          apiService: widget.apiService,
         ),
         _ServiceSubview.history => ServiceRequestPage(
           key: const ValueKey('service-history-flow'),
           onBack: _backToHub,
           initialMode: ServiceRequestInitialMode.history,
+          apiService: widget.apiService,
         ),
         _ => _ServicesHub(
           key: const ValueKey('services-hub'),
@@ -99,14 +103,14 @@ class _ServicesHub extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      ServiceRequestDummy.unitLabel,
+                      'Resident service desk',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Resident ${ServiceRequestDummy.residentName} service desk',
+                      'Create and track maintenance tickets for your unit.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
