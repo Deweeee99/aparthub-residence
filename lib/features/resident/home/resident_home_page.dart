@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
-import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/white_premium_card.dart';
 import '../../../models/community_announcement_models.dart';
 import '../../../models/resident_user.dart';
@@ -58,12 +57,14 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
 
     try {
       final announcements = await _apiService.getResidentAnnouncements();
+
       if (!mounted) {
         return;
       }
 
       final sorted = List<CommunityAnnouncement>.of(announcements)
         ..sort(_sortHighlights);
+
       setState(() {
         _highlights = sorted.take(3).toList();
         _isLoadingHighlights = false;
@@ -76,6 +77,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
       final message = error is ApiServiceException
           ? error.message
           : 'Pengumuman belum bisa dimuat. Coba lagi.';
+
       setState(() {
         _highlightsError = message;
         _isLoadingHighlights = false;
@@ -83,7 +85,9 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
     }
   }
 
-  Future<void> _openHighlightDetail(CommunityAnnouncement announcement) async {
+  Future<void> _openHighlightDetail(
+    CommunityAnnouncement announcement,
+  ) async {
     setState(() {
       _selectedAnnouncement = announcement;
       _isLoadingDetail = true;
@@ -129,242 +133,301 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
     final towerValue = _rawTowerValue(widget.resident?.unit);
     final unitValue = _rawUnitValue(widget.resident?.unit);
     final residentTypeValue = _rawResidentTypeValue(widget.resident);
+
     final towerLabel = _towerLabel(widget.resident?.unit);
     final unitLabel = _unitLabel(widget.resident?.unit);
     final residentTypeLabel = _residentTypeLabel(widget.resident);
     final contractLabel = _contractLabel(widget.resident);
-    final selectedAnnouncementId = _selectedAnnouncement?.id;
+
+    final locationLabel = [
+      if (towerValue.isNotEmpty) 'Tower $towerValue',
+      if (unitValue.isNotEmpty) 'Unit $unitValue',
+    ].join(' • ');
+
     final summaryItems = [
       _SummaryData(label: 'Tower', value: towerLabel),
       _SummaryData(label: 'Unit', value: unitLabel),
       _SummaryData(label: 'Resident Type', value: residentTypeLabel),
       _SummaryData(label: 'Contract End', value: contractLabel),
     ];
+
     final quickActions = [
       _QuickAction(
-        icon: Icons.qr_code_2_rounded,
-        label: 'Visitor Pass',
+        icon: Icons.groups_2_outlined,
+        label: 'Visitor',
         onTap: () => widget.onNavigate(1),
       ),
       _QuickAction(
-        icon: Icons.person_rounded,
-        label: 'Profile',
-        onTap: () => widget.onNavigate(4),
-      ),
-      _QuickAction(
-        icon: Icons.handyman_rounded,
-        label: 'Service',
+        icon: Icons.handyman_outlined,
+        label: 'Service\nRequest',
         onTap: () => widget.onNavigate(2),
       ),
       _QuickAction(
-        icon: Icons.groups_rounded,
-        label: 'Community',
+        icon: Icons.campaign_outlined,
+        label: 'Pengumuman',
         onTap: () => widget.onNavigate(3),
       ),
+      _QuickAction(
+        icon: Icons.person_outline_rounded,
+        label: 'Profil',
+        onTap: () => widget.onNavigate(4),
+      ),
     ];
+
+    final selectedAnnouncementId = _selectedAnnouncement?.id;
 
     return ColoredBox(
       color: Colors.transparent,
       child: ListView(
         key: const ValueKey('resident-home-page'),
-        padding: const EdgeInsets.only(bottom: 128),
+        padding: const EdgeInsets.only(bottom: 120),
         children: [
-          _HeroHeaderStack(
+          _ResidenceHero(
             residentName: residentName,
+            locationLabel: locationLabel,
             residentTypeLabel: residentTypeValue,
-            towerLabel: towerValue,
-            unitLabel: unitValue,
             onBillingTap: widget.onOpenBilling,
           ).animate().fadeIn(duration: 360.ms).moveY(begin: 18, end: 0),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-            child: WhitePremiumCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your Current Balance',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _currency.format(2850000),
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Service charge and facility maintenance due on 25 Jun 2026.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 18),
-                  const Row(
-                    children: [
-                      _InfoChip(
-                        label: 'Due Soon',
-                        color: AppColors.warning,
-                        background: Color(0xFFFFF2DE),
-                      ),
-                      SizedBox(width: 10),
-                      _InfoChip(
-                        label: 'Auto debit inactive',
-                        color: AppColors.textSecondary,
-                        background: AppColors.surfaceMuted,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  LuxuryButton(
-                    key: const ValueKey('current-balance-billing-button'),
-                    label: 'Open Billing',
-                    icon: Icons.arrow_forward_rounded,
-                    onPressed: widget.onOpenBilling,
-                  ),
-                ],
-              ),
-            ),
-          ).animate().fadeIn(duration: 480.ms).moveY(begin: 28, end: 0),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
-              children: [
-                const SectionHeader(
-                  title: 'Quick Access',
-                  actionLabel: 'Resident tools',
-                ),
-                const SizedBox(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const spacing = 12.0;
 
-                    return GridView.count(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: spacing,
-                      crossAxisSpacing: spacing,
-                      childAspectRatio: 1.65,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        for (final action in quickActions)
-                          _QuickAccessCard(action: action),
-                      ],
-                    );
-                  },
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+            child: _DashboardSectionHeader(
+              title: 'AKSES CEPAT',
             ),
           ),
+
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-            child: WhitePremiumCard(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final item in summaryItems)
-                    _SummaryItem(label: item.label, value: item.value),
-                ],
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: quickActions.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.78,
               ),
+              itemBuilder: (context, index) {
+                return _QuickAccessCard(action: quickActions[index]);
+              },
             ),
-          ).animate().fadeIn(duration: 420.ms).moveY(begin: 24, end: 0),
+          ).animate().fadeIn(duration: 460.ms).moveY(begin: 18, end: 0),
+
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
-              children: [
-                const SectionHeader(
-                  title: 'Today Highlights',
-                  actionLabel: 'Curated',
-                ),
-                const SizedBox(height: 14),
-                if (_isLoadingHighlights)
-                  const _HighlightsLoadingCard()
-                else if (_highlightsError != null)
-                  _HighlightsErrorCard(
-                    message: _highlightsError!,
-                    onRetry: _loadHighlights,
-                  )
-                else if (_highlights.isEmpty)
-                  const _HighlightsEmptyCard()
-                else
-                  for (var index = 0; index < _highlights.length; index++) ...[
-                    _ActivityCard(
-                      icon: communityAnnouncementIconFor(_highlights[index]),
-                      eyebrow: communityAnnouncementCategoryLabel(
-                        _highlights[index].category,
-                      ),
-                      title: _highlights[index].title.isEmpty
-                          ? 'Management update'
-                          : _highlights[index].title,
-                      detail: communityAnnouncementPreviewContent(
-                        _highlights[index].content,
-                        maxLength: 120,
-                      ),
-                      accent: communityAnnouncementAccentColor(
-                        _highlights[index],
-                      ),
-                      actionLabel: communityAnnouncementPrimaryBadgeLabel(
-                        _highlights[index],
-                      ),
-                      isSelected:
-                          _isLoadingDetail &&
-                          selectedAnnouncementId == _highlights[index].id,
-                      onTap: () => _openHighlightDetail(_highlights[index]),
-                    ),
-                    if (index < _highlights.length - 1)
-                      const SizedBox(height: 12),
-                  ],
-              ],
+            padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+            child: _DashboardSectionHeader(
+              title: 'RINGKASAN HUNIAN',
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: _ResidenceSummaryCard(items: summaryItems),
+          ).animate().fadeIn(duration: 500.ms).moveY(begin: 20, end: 0),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+            child: _DashboardSectionHeader(
+              title: 'PENGUMUMAN TERBARU',
+              actionLabel: 'Lihat Semua',
+              onAction: () => widget.onNavigate(3),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: _buildHighlights(
+              selectedAnnouncementId: selectedAnnouncementId,
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildHighlights({
+    required String? selectedAnnouncementId,
+  }) {
+    if (_isLoadingHighlights) {
+      return const _HighlightsLoadingCard();
+    }
+
+    if (_highlightsError != null) {
+      return _HighlightsErrorCard(
+        message: _highlightsError!,
+        onRetry: _loadHighlights,
+      );
+    }
+
+    if (_highlights.isEmpty) {
+      return const _HighlightsEmptyCard();
+    }
+
+    return Column(
+      children: [
+        for (var index = 0; index < _highlights.length; index++) ...[
+          _AnnouncementDashboardCard(
+            icon: communityAnnouncementIconFor(_highlights[index]),
+            title: _highlights[index].title.isEmpty
+                ? 'Pengumuman Management'
+                : _highlights[index].title,
+            detail: communityAnnouncementPreviewContent(
+              _highlights[index].content,
+              maxLength: 110,
+            ),
+            accent: communityAnnouncementAccentColor(_highlights[index]),
+            badgeLabel: communityAnnouncementPrimaryBadgeLabel(
+              _highlights[index],
+            ),
+            isSelected:
+                _isLoadingDetail &&
+                selectedAnnouncementId == _highlights[index].id,
+            onTap: () => _openHighlightDetail(_highlights[index]),
+          ),
+          if (index < _highlights.length - 1) const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
 }
 
-class _HeroHeaderStack extends StatelessWidget {
-  const _HeroHeaderStack({
+class _ResidenceHero extends StatelessWidget {
+  const _ResidenceHero({
     required this.residentName,
+    required this.locationLabel,
     required this.residentTypeLabel,
-    required this.towerLabel,
-    required this.unitLabel,
     required this.onBillingTap,
   });
 
   final String residentName;
+  final String locationLabel;
   final String residentTypeLabel;
-  final String towerLabel;
-  final String unitLabel;
   final VoidCallback onBillingTap;
 
   @override
   Widget build(BuildContext context) {
+    final displayName = residentName.isEmpty ? 'Resident' : residentName;
+    final displayLocation = locationLabel.isEmpty
+        ? 'Unit belum ditentukan'
+        : locationLabel;
+
     return SizedBox(
-      height: 382,
+      height: 372,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          _HeroHeader(
-            residentName: residentName,
-            residentTypeLabel: residentTypeLabel,
-            towerLabel: towerLabel,
-            unitLabel: unitLabel,
+          Container(
+            height: 286,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.navy,
+                  Color(0xFF0E3478),
+                  AppColors.blue,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
           ),
-          const Positioned(
-            left: 0,
-            right: 0,
-            top: 220,
-            height: 96,
-            child: IgnorePointer(child: _HeroFadeTransition()),
-          ),
+
           Positioned(
+            right: -18,
+            bottom: 88,
+            child: Icon(
+              Icons.apartment_rounded,
+              size: 192,
+              color: Colors.white.withValues(alpha: 0.10),
+            ),
+          ),
+
+          Positioned(
+            right: 56,
+            top: 142,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.04),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _greeting(),
+                          style:
+                              Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                        ),
+                      ),
+                      const _NotificationBell(),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        Theme.of(context).textTheme.displaySmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 19,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          displayLocation,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.92),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (residentTypeLabel.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _ResidentTypeBadge(label: residentTypeLabel),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: 218,
             left: 20,
             right: 20,
-            top: 258,
-            child: _MonthlyBillingCard(onBillingTap: onBillingTap),
+            child: _BillingHeroCard(
+              onBillingTap: onBillingTap,
+            ),
           ),
         ],
       ),
@@ -372,156 +435,103 @@ class _HeroHeaderStack extends StatelessWidget {
   }
 }
 
-class _HeroHeader extends StatelessWidget {
-  const _HeroHeader({
-    required this.residentName,
-    required this.residentTypeLabel,
-    required this.towerLabel,
-    required this.unitLabel,
+class _BillingHeroCard extends StatelessWidget {
+  const _BillingHeroCard({
+    required this.onBillingTap,
   });
-
-  final String residentName;
-  final String residentTypeLabel;
-  final String towerLabel;
-  final String unitLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final heroBadges = [
-      if (towerLabel.isNotEmpty) 'Tower $towerLabel',
-      if (unitLabel.isNotEmpty) 'Unit $unitLabel',
-      if (residentTypeLabel.isNotEmpty) residentTypeLabel,
-    ];
-
-    return Container(
-      width: double.infinity,
-      height: 306,
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 52),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.navy, AppColors.blue],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        residentName.isEmpty
-                            ? 'Good Evening'
-                            : 'Good Evening, $residentName',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Your residence essentials, beautifully organized.',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.82),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                _HeaderIconButton(
-                  icon: Icons.notifications_none_rounded,
-                  onTap: () {},
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (heroBadges.isNotEmpty)
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final badge in heroBadges) _HeroBadge(label: badge),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroFadeTransition extends StatelessWidget {
-  const _HeroFadeTransition();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            AppColors.background.withValues(alpha: 0.84),
-            AppColors.background,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MonthlyBillingCard extends StatelessWidget {
-  const _MonthlyBillingCard({required this.onBillingTap});
 
   final VoidCallback onBillingTap;
 
   @override
   Widget build(BuildContext context) {
     return WhitePremiumCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          const _GoldIcon(icon: Icons.account_balance_wallet_rounded),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Monthly billing status',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                  'TOTAL TAGIHAN',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                      ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
-                  'One invoice due in 6 days.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  _currency.format(2850000),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: AppColors.navy,
+                            fontWeight: FontWeight.w900,
+                          ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Jatuh tempo 25 Jun 2026',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          LuxuryButton(
-            key: const ValueKey('monthly-billing-button'),
-            label: 'Pay now',
-            fullWidth: false,
-            onPressed: onBillingTap,
+          const SizedBox(width: 14),
+          _PayNowButton(
+            key: const ValueKey('current-balance-billing-button'),
+            onTap: onBillingTap,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PayNowButton extends StatelessWidget {
+  const _PayNowButton({
+    super.key,
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('monthly-billing-button'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          width: 104,
+          height: 62,
+          decoration: BoxDecoration(
+            color: AppColors.gold,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.gold.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              'BAYAR',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -540,7 +550,9 @@ class _QuickAction {
 }
 
 class _QuickAccessCard extends StatelessWidget {
-  const _QuickAccessCard({required this.action});
+  const _QuickAccessCard({
+    required this.action,
+  });
 
   final _QuickAction action;
 
@@ -548,24 +560,26 @@ class _QuickAccessCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return WhitePremiumCard(
       onTap: action.onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _GoldIcon(icon: action.icon, size: 40, iconSize: 20),
-          const SizedBox(height: 6),
-          Flexible(
-            child: Text(
-              action.label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w800,
-                height: 1.12,
-              ),
-            ),
+          Icon(
+            action.icon,
+            color: AppColors.navy,
+            size: 34,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            action.label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w800,
+                  height: 1.12,
+                ),
           ),
         ],
       ),
@@ -573,30 +587,94 @@ class _QuickAccessCard extends StatelessWidget {
   }
 }
 
-class _GoldIcon extends StatelessWidget {
-  const _GoldIcon({required this.icon, this.size = 52, this.iconSize = 24});
+class _DashboardSectionHeader extends StatelessWidget {
+  const _DashboardSectionHeader({
+    required this.title,
+    this.actionLabel,
+    this.onAction,
+  });
 
-  final IconData icon;
-  final double size;
-  final double iconSize;
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppColors.goldSoft,
-        borderRadius: BorderRadius.circular(size * 0.34),
-        border: Border.all(color: AppColors.borderSoft),
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.1,
+                ),
+          ),
+        ),
+        if (actionLabel != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.blue,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 8,
+              ),
+            ),
+            child: Text(
+              actionLabel!,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.blue,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ResidenceSummaryCard extends StatelessWidget {
+  const _ResidenceSummaryCard({
+    required this.items,
+  });
+
+  final List<_SummaryData> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      padding: const EdgeInsets.all(14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = (constraints.maxWidth - 12) / 2;
+
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final item in items)
+                SizedBox(
+                  width: itemWidth,
+                  child: _SummaryItem(
+                    label: item.label,
+                    value: item.value,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
-      child: Icon(icon, color: AppColors.gold, size: iconSize),
     );
   }
 }
 
 class _SummaryItem extends StatelessWidget {
-  const _SummaryItem({required this.label, required this.value});
+  const _SummaryItem({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -604,11 +682,13 @@ class _SummaryItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 132),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 13,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderSoft),
       ),
       child: Column(
@@ -616,18 +696,22 @@ class _SummaryItem extends StatelessWidget {
         children: [
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textMuted,
-              fontWeight: FontWeight.w700,
-            ),
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 7),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
           ),
         ],
       ),
@@ -635,11 +719,368 @@ class _SummaryItem extends StatelessWidget {
   }
 }
 
+class _AnnouncementDashboardCard extends StatelessWidget {
+  const _AnnouncementDashboardCard({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.accent,
+    required this.badgeLabel,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final Color accent;
+  final String badgeLabel;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              icon,
+              color: accent,
+              size: 34,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w900,
+                        height: 1.14,
+                      ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  detail.isEmpty
+                      ? 'Informasi terbaru dari management apartemen.'
+                      : detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.34,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            children: [
+              if (isSelected)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                )
+              else
+                _AnnouncementBadge(
+                  label: badgeLabel,
+                  color: accent,
+                ),
+              const SizedBox(height: 12),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textMuted,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementBadge extends StatelessWidget {
+  const _AnnouncementBadge({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 48),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+      ),
+    );
+  }
+}
+
+class _HighlightsLoadingCard extends StatelessWidget {
+  const _HighlightsLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Memuat pengumuman...',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sedang mengambil informasi terbaru dari management.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightsErrorCard extends StatelessWidget {
+  const _HighlightsErrorCard({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 38,
+            color: AppColors.warning,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 14),
+          LuxuryButton(
+            label: 'Coba Lagi',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightsEmptyCard extends StatelessWidget {
+  const _HighlightsEmptyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      child: Column(
+        children: [
+          const Icon(
+            Icons.notifications_paused_outlined,
+            size: 40,
+            color: AppColors.textMuted,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Belum ada pengumuman terbaru.',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Informasi dari management akan tampil pada area ini.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {},
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        width: 52,
+        height: 52,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.14),
+                ),
+              ),
+              child: const Icon(
+                Icons.notifications_none_rounded,
+                color: Colors.white,
+                size: 27,
+              ),
+            ),
+            Positioned(
+              top: 1,
+              right: 1,
+              child: Container(
+                width: 21,
+                height: 21,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF4B4B),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.navy,
+                    width: 2,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '1',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResidentTypeBadge extends StatelessWidget {
+  const _ResidentTypeBadge({
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+      ),
+    );
+  }
+}
+
 class _SummaryData {
-  const _SummaryData({required this.label, required this.value});
+  const _SummaryData({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
+}
+
+String _greeting() {
+  final hour = DateTime.now().hour;
+
+  if (hour < 11) {
+    return 'Selamat pagi,';
+  }
+
+  if (hour < 15) {
+    return 'Selamat siang,';
+  }
+
+  if (hour < 18) {
+    return 'Selamat sore,';
+  }
+
+  return 'Selamat malam,';
 }
 
 String _displayName(ResidentUser? resident) {
@@ -676,11 +1117,13 @@ String _residentTypeLabel(ResidentUser? resident) {
 
 String _contractLabel(ResidentUser? resident) {
   final contractEndDate = resident?.contractEndDate.trim() ?? '';
+
   if (contractEndDate.isEmpty) {
     return 'Not available';
   }
 
   final parsedDate = DateTime.tryParse(contractEndDate);
+
   if (parsedDate == null) {
     return contractEndDate;
   }
@@ -688,7 +1131,10 @@ String _contractLabel(ResidentUser? resident) {
   return DateFormat('d MMM yyyy', 'id_ID').format(parsedDate);
 }
 
-int _sortHighlights(CommunityAnnouncement left, CommunityAnnouncement right) {
+int _sortHighlights(
+  CommunityAnnouncement left,
+  CommunityAnnouncement right,
+) {
   if (left.isPinned != right.isPinned) {
     return left.isPinned ? -1 : 1;
   }
@@ -709,259 +1155,4 @@ int _sortHighlights(CommunityAnnouncement left, CommunityAnnouncement right) {
   }
 
   return rightDate.compareTo(leftDate);
-}
-
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({
-    required this.icon,
-    required this.eyebrow,
-    required this.title,
-    required this.detail,
-    required this.accent,
-    required this.actionLabel,
-    this.isSelected = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String eyebrow;
-  final String title;
-  final String detail;
-  final Color accent;
-  final String actionLabel;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final chipColor = isSelected ? AppColors.gold : accent;
-    return WhitePremiumCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  eyebrow,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-              ),
-              _InfoChip(
-                label: actionLabel,
-                color: chipColor,
-                background: chipColor.withValues(alpha: 0.10),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Text(detail, style: Theme.of(context).textTheme.bodyMedium),
-        ],
-      ),
-    );
-  }
-}
-
-class _HighlightsLoadingCard extends StatelessWidget {
-  const _HighlightsLoadingCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return WhitePremiumCard(
-      child: Column(
-        children: [
-          const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.4),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Loading highlights...',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Curating the latest management announcements for your home dashboard.',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HighlightsErrorCard extends StatelessWidget {
-  const _HighlightsErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return WhitePremiumCard(
-      child: Column(
-        children: [
-          const _GoldIcon(
-            icon: Icons.error_outline_rounded,
-            size: 52,
-            iconSize: 24,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          LuxuryButton(
-            label: 'Retry',
-            icon: Icons.refresh_rounded,
-            onPressed: onRetry,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HighlightsEmptyCard extends StatelessWidget {
-  const _HighlightsEmptyCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return WhitePremiumCard(
-      child: Column(
-        children: [
-          const _GoldIcon(
-            icon: Icons.notifications_paused_outlined,
-            size: 52,
-            iconSize: 24,
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'No highlights available yet.',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Fresh announcements from the management office will appear here.',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.label,
-    required this.color,
-    required this.background,
-  });
-
-  final String label;
-  final Color color;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-        ),
-        child: Icon(icon, color: Colors.white),
-      ),
-    );
-  }
-}
-
-class _HeroBadge extends StatelessWidget {
-  const _HeroBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
 }

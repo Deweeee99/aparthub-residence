@@ -19,13 +19,17 @@ class ServicesPage extends StatefulWidget {
 class _ServicesPageState extends State<ServicesPage> {
   var _activeSubview = _ServiceSubview.hub;
 
-  void _openRequest() =>
-      setState(() => _activeSubview = _ServiceSubview.request);
+  void _openRequest() {
+    setState(() => _activeSubview = _ServiceSubview.request);
+  }
 
-  void _openHistory() =>
-      setState(() => _activeSubview = _ServiceSubview.history);
+  void _openHistory() {
+    setState(() => _activeSubview = _ServiceSubview.history);
+  }
 
-  void _backToHub() => setState(() => _activeSubview = _ServiceSubview.hub);
+  void _backToHub() {
+    setState(() => _activeSubview = _ServiceSubview.hub);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,22 +37,22 @@ class _ServicesPageState extends State<ServicesPage> {
       duration: const Duration(milliseconds: 240),
       child: switch (_activeSubview) {
         _ServiceSubview.request => ServiceRequestPage(
-          key: const ValueKey('service-request-flow'),
-          onBack: _backToHub,
-          initialMode: ServiceRequestInitialMode.create,
-          apiService: widget.apiService,
-        ),
+            key: const ValueKey('service-request-flow'),
+            onBack: _backToHub,
+            initialMode: ServiceRequestInitialMode.create,
+            apiService: widget.apiService,
+          ),
         _ServiceSubview.history => ServiceRequestPage(
-          key: const ValueKey('service-history-flow'),
-          onBack: _backToHub,
-          initialMode: ServiceRequestInitialMode.history,
-          apiService: widget.apiService,
-        ),
+            key: const ValueKey('service-history-flow'),
+            onBack: _backToHub,
+            initialMode: ServiceRequestInitialMode.history,
+            apiService: widget.apiService,
+          ),
         _ => _ServicesHub(
-          key: const ValueKey('services-hub'),
-          onCreateRequest: _openRequest,
-          onOpenHistory: _openHistory,
-        ),
+            key: const ValueKey('services-hub'),
+            onCreateRequest: _openRequest,
+            onOpenHistory: _openHistory,
+          ),
       },
     );
   }
@@ -68,108 +72,187 @@ class _ServicesHub extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       key: const ValueKey('services-page'),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 128),
+      padding: const EdgeInsets.only(bottom: 128),
       children: [
-        Text(
-          'Services',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
+        const _ServicesHero(),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Transform.translate(
+            offset: const Offset(0, -22),
+            child: const _ServiceDeskCard(),
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Create maintenance requests and monitor every service ticket.',
-          style: Theme.of(context).textTheme.bodyMedium,
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+          child: _SectionHeader(
+            title: 'LAYANAN TEKNIS',
+          ),
         ),
-        const SizedBox(height: 18),
-        WhitePremiumCard(
-          child: Row(
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.88,
             children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: AppColors.goldSoft,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.apartment_rounded,
-                  color: AppColors.gold,
-                ),
+              _ServiceActionCard(
+                icon: Icons.build_circle_outlined,
+                title: 'Buat Service\nRequest',
+                subtitle:
+                    'Ajukan keluhan maintenance, listrik, air, dan kebersihan.',
+                actionLabel: 'Buat Laporan',
+                accentColor: AppColors.gold,
+                iconBackground: AppColors.goldSoft,
+                onTap: onCreateRequest,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Resident service desk',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Create and track maintenance tickets for your unit.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+              _ServiceActionCard(
+                icon: Icons.history_rounded,
+                title: 'Riwayat\nLaporan',
+                subtitle:
+                    'Pantau status laporan dari proses hingga selesai.',
+                actionLabel: 'Lihat Riwayat',
+                accentColor: AppColors.navy,
+                iconBackground: AppColors.blueSoft,
+                onTap: onOpenHistory,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        _ServiceFeatureCard(
-          icon: Icons.build_circle_outlined,
-          title: 'Service Request',
-          subtitle: 'Maintenance, plumbing, electrical, and housekeeping.',
-          actionLabel: 'Create Request',
-          onTap: onCreateRequest,
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+          child: _SectionHeader(
+            title: 'INFORMASI LAYANAN',
+          ),
         ),
-        const SizedBox(height: 14),
-        _ServiceFeatureCard(
-          icon: Icons.history_rounded,
-          title: 'Service History',
-          subtitle: 'Track open, assigned, in-progress, and completed tickets.',
-          actionLabel: 'Open History',
-          onTap: onOpenHistory,
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: const _ServiceInformationCard(),
         ),
       ],
     );
   }
 }
 
-class _ServiceFeatureCard extends StatelessWidget {
-  const _ServiceFeatureCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.actionLabel,
-    required this.onTap,
-  });
+class _ServicesHero extends StatelessWidget {
+  const _ServicesHero();
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String actionLabel;
-  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 238,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.navy,
+            Color(0xFF103B86),
+            AppColors.blue,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -24,
+            bottom: -28,
+            child: Icon(
+              Icons.handyman_rounded,
+              size: 205,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Positioned(
+            right: 30,
+            top: 44,
+            child: Container(
+              width: 112,
+              height: 112,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.handyman_outlined,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Service Request',
+                    style:
+                        Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Laporkan kebutuhan perbaikan unit Anda dengan cepat.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.84),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceDeskCard extends StatelessWidget {
+  const _ServiceDeskCard();
 
   @override
   Widget build(BuildContext context) {
     return WhitePremiumCard(
-      onTap: onTap,
+      padding: const EdgeInsets.all(16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: AppColors.blueSoft,
-              borderRadius: BorderRadius.circular(18),
+              color: AppColors.goldSoft,
+              borderRadius: BorderRadius.circular(17),
             ),
-            child: Icon(icon, color: AppColors.navy),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              color: AppColors.gold,
+              size: 28,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -177,36 +260,196 @@ class _ServiceFeatureCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  'Resident Service Desk',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      actionLabel,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.gold,
+                        color: AppColors.navy,
                         fontWeight: FontWeight.w900,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 18,
-                      color: AppColors.gold,
-                    ),
-                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Kelola laporan perbaikan dan pantau progres teknisi.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(
+            Icons.verified_outlined,
+            color: AppColors.gold,
+            size: 24,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceActionCard extends StatelessWidget {
+  const _ServiceActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.actionLabel,
+    required this.accentColor,
+    required this.iconBackground,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String actionLabel;
+  final Color accentColor;
+  final Color iconBackground;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              icon,
+              color: accentColor,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                  height: 1.14,
+                ),
+          ),
+          const SizedBox(height: 7),
+          Expanded(
+            child: Text(
+              subtitle,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.32,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  actionLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: accentColor,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: accentColor,
+                size: 18,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceInformationCard extends StatelessWidget {
+  const _ServiceInformationCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.blueSoft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.navy,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Alur Penanganan Laporan',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Setelah laporan dikirim, management akan melakukan verifikasi, menugaskan teknisi, dan memperbarui status pekerjaan hingga dinyatakan selesai.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.42,
+                      ),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+  });
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.navy,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.2,
+          ),
     );
   }
 }
