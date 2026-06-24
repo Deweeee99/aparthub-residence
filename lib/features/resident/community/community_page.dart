@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/community_announcement_models.dart';
 import '../../../services/api_service.dart';
 import 'widgets/community_announcement_presentation.dart';
@@ -154,6 +155,7 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final filters = _filters;
     final announcements = _filteredAnnouncements;
     final selectedAnnouncementId = _selectedAnnouncement?.id;
@@ -170,8 +172,8 @@ class _CommunityPageState extends State<CommunityPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
           child: _SectionHeader(
-            title: 'FILTER PENGUMUMAN',
-            actionLabel: 'Muat Ulang',
+            title: l10n.filterAnnouncements.toUpperCase(),
+            actionLabel: l10n.reload,
             onAction: _isLoading ? null : _loadAnnouncements,
           ),
         ),
@@ -202,7 +204,7 @@ class _CommunityPageState extends State<CommunityPage> {
           padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
           child: _SectionHeader(
             title: _filter == 'All'
-                ? 'PENGUMUMAN TERBARU'
+                ? l10n.newestAnnouncements.toUpperCase()
                 : 'PENGUMUMAN: ${_filter.toUpperCase()}',
           ),
         ),
@@ -219,9 +221,7 @@ class _CommunityPageState extends State<CommunityPage> {
                   onRetry: _loadAnnouncements,
                 ),
 
-              if (!_isLoading &&
-                  _errorMessage == null &&
-                  announcements.isEmpty)
+              if (!_isLoading && _errorMessage == null && announcements.isEmpty)
                 const _AnnouncementsEmptyCard(),
 
               if (!_isLoading && _errorMessage == null)
@@ -229,8 +229,7 @@ class _CommunityPageState extends State<CommunityPage> {
                   _AnnouncementCard(
                     item: item,
                     isSelected:
-                        _isLoadingDetail &&
-                        selectedAnnouncementId == item.id,
+                        _isLoadingDetail && selectedAnnouncementId == item.id,
                     onTap: () => _openAnnouncementDetail(item),
                   ),
             ],
@@ -252,6 +251,8 @@ class _CommunityHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return SizedBox(
       height: 310,
       child: Stack(
@@ -262,11 +263,7 @@ class _CommunityHero extends StatelessWidget {
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.navy,
-                  Color(0xFF103B86),
-                  AppColors.blue,
-                ],
+                colors: [AppColors.navy, Color(0xFF103B86), AppColors.blue],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -318,19 +315,18 @@ class _CommunityHero extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    'Announcement Center',
-                    style:
-                        Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
+                    l10n.announcementCenter,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Informasi dan pembaruan terbaru dari management.',
+                    l10n.communityHeroSubtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                        ),
+                      color: Colors.white.withValues(alpha: 0.84),
+                    ),
                   ),
                   const SizedBox(height: 28),
                 ],
@@ -363,6 +359,8 @@ class _AnnouncementSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Row(
@@ -383,19 +381,15 @@ class _AnnouncementSummaryCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: _SummaryMetric(
-              label: 'Total Pengumuman',
+              label: l10n.totalAnnouncements,
               value: '$totalAnnouncements',
             ),
           ),
-          Container(
-            width: 1,
-            height: 42,
-            color: AppColors.borderSoft,
-          ),
+          Container(width: 1, height: 42, color: AppColors.borderSoft),
           const SizedBox(width: 16),
           Expanded(
             child: _SummaryMetric(
-              label: 'Pengumuman Penting',
+              label: l10n.importantAnnouncements,
               value: '$pinnedCount',
               valueColor: AppColors.gold,
             ),
@@ -427,17 +421,17 @@ class _SummaryMetric extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textMuted,
-                fontWeight: FontWeight.w700,
-              ),
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
           value,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: valueColor ?? AppColors.navy,
-                fontWeight: FontWeight.w900,
-              ),
+            color: valueColor ?? AppColors.navy,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ],
     );
@@ -445,11 +439,7 @@ class _SummaryMetric extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    this.actionLabel,
-    this.onAction,
-  });
+  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
 
   final String title;
   final String? actionLabel;
@@ -463,10 +453,10 @@ class _SectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.2,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.2,
+            ),
           ),
         ),
         if (actionLabel != null)
@@ -474,17 +464,14 @@ class _SectionHeader extends StatelessWidget {
             onPressed: onAction,
             style: TextButton.styleFrom(
               foregroundColor: AppColors.blue,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             ),
             child: Text(
               actionLabel!,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.blue,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: AppColors.blue,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
       ],
@@ -522,9 +509,9 @@ class _FilterChip extends StatelessWidget {
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: active ? Colors.white : AppColors.textSecondary,
-                  fontWeight: active ? FontWeight.w900 : FontWeight.w700,
-                ),
+              color: active ? Colors.white : AppColors.textSecondary,
+              fontWeight: active ? FontWeight.w900 : FontWeight.w700,
+            ),
           ),
         ),
       ),
@@ -546,6 +533,7 @@ class _AnnouncementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accentColor = communityAnnouncementAccentColor(item);
+    final l10n = AppLocalizations.of(context);
 
     return WhitePremiumCard(
       margin: const EdgeInsets.only(bottom: 12),
@@ -569,16 +557,15 @@ class _AnnouncementCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item.title.isEmpty
-                            ? 'Pengumuman Management'
+                            ? l10n.managementAnnouncement
                             : item.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: AppColors.navy,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.18,
-                                ),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w900,
+                          height: 1.18,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -590,7 +577,7 @@ class _AnnouncementCard extends StatelessWidget {
                       )
                     else
                       _AnnouncementBadge(
-                        label: communityAnnouncementPrimaryBadgeLabel(item),
+                        label: item.isPinned ? l10n.pinned : l10n.update,
                         accentColor: accentColor,
                       ),
                   ],
@@ -601,9 +588,9 @@ class _AnnouncementCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.36,
-                      ),
+                    color: AppColors.textSecondary,
+                    height: 1.36,
+                  ),
                 ),
                 const SizedBox(height: 11),
                 Row(
@@ -620,9 +607,9 @@ class _AnnouncementCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -647,41 +634,27 @@ class _AnnouncementCard extends StatelessWidget {
 }
 
 class _AnnouncementIcon extends StatelessWidget {
-  const _AnnouncementIcon({
-    required this.icon,
-    required this.color,
-    this.size = 52,
-    this.iconSize = 26,
-  });
+  const _AnnouncementIcon({required this.icon, required this.color});
 
   final IconData icon;
   final Color color;
-  final double size;
-  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: iconSize,
-      ),
+      child: Icon(icon, color: color, size: 26),
     );
   }
 }
 
 class _AnnouncementBadge extends StatelessWidget {
-  const _AnnouncementBadge({
-    required this.label,
-    required this.accentColor,
-  });
+  const _AnnouncementBadge({required this.label, required this.accentColor});
 
   final String label;
   final Color accentColor;
@@ -709,18 +682,16 @@ class _AnnouncementBadge extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w900,
-            ),
+          color: foreground,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
 }
 
 class _CategoryBadge extends StatelessWidget {
-  const _CategoryBadge({
-    required this.label,
-  });
+  const _CategoryBadge({required this.label});
 
   final String label;
 
@@ -739,9 +710,9 @@ class _CategoryBadge extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w800,
-            ),
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -752,6 +723,8 @@ class _AnnouncementsLoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -767,19 +740,19 @@ class _AnnouncementsLoadingCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Memuat pengumuman...',
+            l10n.loadingAnnouncements,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Sedang menyinkronkan informasi terbaru dari management.',
+            l10n.syncAnnouncements,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -788,16 +761,15 @@ class _AnnouncementsLoadingCard extends StatelessWidget {
 }
 
 class _AnnouncementsErrorCard extends StatelessWidget {
-  const _AnnouncementsErrorCard({
-    required this.message,
-    required this.onRetry,
-  });
+  const _AnnouncementsErrorCard({required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -810,21 +782,21 @@ class _AnnouncementsErrorCard extends StatelessWidget {
             message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Silakan coba kembali untuk memuat pengumuman terbaru.',
+            l10n.retryAnnouncementsHint,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           LuxuryButton(
-            label: 'Coba Lagi',
+            label: l10n.retry,
             icon: Icons.refresh_rounded,
             onPressed: onRetry,
           ),
@@ -839,6 +811,8 @@ class _AnnouncementsEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -848,23 +822,22 @@ class _AnnouncementsEmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Belum ada pengumuman.',
+            l10n.noAnnouncementsAvailable,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Informasi terbaru dari management akan tampil di halaman ini.',
+            l10n.announcementsEmptyHint,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
     );
   }
 }
-

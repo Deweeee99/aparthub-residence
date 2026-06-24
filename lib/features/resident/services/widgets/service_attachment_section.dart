@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/white_premium_card.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../models/service_request_models.dart';
 import '../../../../services/api_client.dart';
 
@@ -66,6 +67,7 @@ Future<void> showServiceAttachmentPreview(
     isScrollControlled: true,
     builder: (context) {
       final previewUrl = resolveServiceAttachmentUrl(attachment.url);
+      final l10n = AppLocalizations.of(context);
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -84,7 +86,7 @@ Future<void> showServiceAttachmentPreview(
                     Expanded(
                       child: Text(
                         attachment.fileName.isEmpty
-                            ? 'Attachment Preview'
+                            ? l10n.attachmentPreview
                             : attachment.fileName,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
@@ -103,7 +105,7 @@ Future<void> showServiceAttachmentPreview(
                 if (previewUrl.isEmpty)
                   _AttachmentFallbackCard(
                     attachment: attachment,
-                    message: 'Preview is unavailable for this image.',
+                    message: l10n.previewUnavailable,
                   )
                 else
                   ClipRRect(
@@ -129,7 +131,7 @@ Future<void> showServiceAttachmentPreview(
                             _debugAttachmentImageFailure(previewUrl, error);
                             return _AttachmentFallbackCard(
                               attachment: attachment,
-                              message: 'Preview is unavailable for this image.',
+                              message: l10n.previewUnavailable,
                             );
                           },
                         ),
@@ -227,6 +229,7 @@ class _ImageAttachmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final previewUrl = resolveServiceAttachmentUrl(attachment.url);
+    final l10n = AppLocalizations.of(context);
     return SizedBox(
       width: 108,
       child: InkWell(
@@ -264,7 +267,7 @@ class _ImageAttachmentCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 attachment.fileName.isEmpty
-                    ? 'Image Attachment'
+                    ? l10n.imageAttachment
                     : attachment.fileName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -288,6 +291,8 @@ class _FileAttachmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       key: ValueKey('service-attachment-file-${attachment.id}'),
       margin: EdgeInsets.zero,
@@ -302,7 +307,7 @@ class _FileAttachmentCard extends StatelessWidget {
               children: [
                 Text(
                   attachment.fileName.isEmpty
-                      ? 'Attachment File'
+                      ? l10n.attachmentFile
                       : attachment.fileName,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textPrimary,
@@ -312,7 +317,7 @@ class _FileAttachmentCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   attachment.mimeType.isEmpty
-                      ? 'File attachment'
+                      ? l10n.fileAttachment
                       : attachment.mimeType,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
@@ -370,7 +375,7 @@ class _AttachmentFallbackCard extends StatelessWidget {
               Text(
                 message ??
                     (attachment?.fileName.isEmpty ?? true
-                        ? 'Preview unavailable'
+                        ? AppLocalizations.of(context).previewUnavailable
                         : attachment!.fileName),
                 textAlign: TextAlign.center,
                 maxLines: compact ? 2 : 3,

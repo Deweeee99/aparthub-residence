@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../services/api_service.dart';
 import 'service_request_page.dart';
 
@@ -37,22 +38,22 @@ class _ServicesPageState extends State<ServicesPage> {
       duration: const Duration(milliseconds: 240),
       child: switch (_activeSubview) {
         _ServiceSubview.request => ServiceRequestPage(
-            key: const ValueKey('service-request-flow'),
-            onBack: _backToHub,
-            initialMode: ServiceRequestInitialMode.create,
-            apiService: widget.apiService,
-          ),
+          key: const ValueKey('service-request-flow'),
+          onBack: _backToHub,
+          initialMode: ServiceRequestInitialMode.create,
+          apiService: widget.apiService,
+        ),
         _ServiceSubview.history => ServiceRequestPage(
-            key: const ValueKey('service-history-flow'),
-            onBack: _backToHub,
-            initialMode: ServiceRequestInitialMode.history,
-            apiService: widget.apiService,
-          ),
+          key: const ValueKey('service-history-flow'),
+          onBack: _backToHub,
+          initialMode: ServiceRequestInitialMode.history,
+          apiService: widget.apiService,
+        ),
         _ => _ServicesHub(
-            key: const ValueKey('services-hub'),
-            onCreateRequest: _openRequest,
-            onOpenHistory: _openHistory,
-          ),
+          key: const ValueKey('services-hub'),
+          onCreateRequest: _openRequest,
+          onOpenHistory: _openHistory,
+        ),
       },
     );
   }
@@ -70,6 +71,8 @@ class _ServicesHub extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return ListView(
       key: const ValueKey('services-page'),
       padding: const EdgeInsets.only(bottom: 128),
@@ -86,9 +89,7 @@ class _ServicesHub extends StatelessWidget {
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
-          child: _SectionHeader(
-            title: 'LAYANAN TEKNIS',
-          ),
+          child: _SectionHeader(title: l10n.technicalServices.toUpperCase()),
         ),
 
         Padding(
@@ -103,20 +104,18 @@ class _ServicesHub extends StatelessWidget {
             children: [
               _ServiceActionCard(
                 icon: Icons.build_circle_outlined,
-                title: 'Buat Service\nRequest',
-                subtitle:
-                    'Ajukan keluhan maintenance, listrik, air, dan kebersihan.',
-                actionLabel: 'Buat Laporan',
+                title: l10n.createServiceRequest.replaceFirst(' ', '\n'),
+                subtitle: l10n.serviceRequestCardSubtitle,
+                actionLabel: l10n.submitRequest,
                 accentColor: AppColors.gold,
                 iconBackground: AppColors.goldSoft,
                 onTap: onCreateRequest,
               ),
               _ServiceActionCard(
                 icon: Icons.history_rounded,
-                title: 'Riwayat\nLaporan',
-                subtitle:
-                    'Pantau status laporan dari proses hingga selesai.',
-                actionLabel: 'Lihat Riwayat',
+                title: l10n.serviceHistory.replaceFirst(' ', '\n'),
+                subtitle: l10n.serviceHistoryCardSubtitle,
+                actionLabel: l10n.viewServiceHistory,
                 accentColor: AppColors.navy,
                 iconBackground: AppColors.blueSoft,
                 onTap: onOpenHistory,
@@ -127,9 +126,7 @@ class _ServicesHub extends StatelessWidget {
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-          child: _SectionHeader(
-            title: 'INFORMASI LAYANAN',
-          ),
+          child: _SectionHeader(title: l10n.serviceInformation.toUpperCase()),
         ),
 
         Padding(
@@ -146,16 +143,14 @@ class _ServicesHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       height: 238,
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.navy,
-            Color(0xFF103B86),
-            AppColors.blue,
-          ],
+          colors: [AppColors.navy, Color(0xFF103B86), AppColors.blue],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -208,19 +203,18 @@ class _ServicesHero extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    'Service Request',
-                    style:
-                        Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
+                    l10n.serviceRequest,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Laporkan kebutuhan perbaikan unit Anda dengan cepat.',
+                    l10n.serviceHeroSubtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                        ),
+                      color: Colors.white.withValues(alpha: 0.84),
+                    ),
                   ),
                 ],
               ),
@@ -237,6 +231,8 @@ class _ServiceDeskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -260,32 +256,28 @@ class _ServiceDeskCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Resident Service Desk',
+                  l10n.serviceDesk,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'Kelola laporan perbaikan dan pantau progres teknisi.',
+                  l10n.serviceDeskSubtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(
-            Icons.verified_outlined,
-            color: AppColors.gold,
-            size: 24,
-          ),
+          const Icon(Icons.verified_outlined, color: AppColors.gold, size: 24),
         ],
       ),
     );
@@ -326,11 +318,7 @@ class _ServiceActionCard extends StatelessWidget {
               color: iconBackground,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(
-              icon,
-              color: accentColor,
-              size: 28,
-            ),
+            child: Icon(icon, color: accentColor, size: 28),
           ),
           const SizedBox(height: 14),
           Text(
@@ -338,10 +326,10 @@ class _ServiceActionCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                  height: 1.14,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+              height: 1.14,
+            ),
           ),
           const SizedBox(height: 7),
           Expanded(
@@ -350,9 +338,9 @@ class _ServiceActionCard extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.32,
-                  ),
+                color: AppColors.textSecondary,
+                height: 1.32,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -364,16 +352,12 @@ class _ServiceActionCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: accentColor,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: accentColor,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_rounded,
-                color: accentColor,
-                size: 18,
-              ),
+              Icon(Icons.arrow_forward_rounded, color: accentColor, size: 18),
             ],
           ),
         ],
@@ -387,6 +371,8 @@ class _ServiceInformationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -411,19 +397,19 @@ class _ServiceInformationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Alur Penanganan Laporan',
+                  l10n.handlingFlowTitle,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Setelah laporan dikirim, management akan melakukan verifikasi, menugaskan teknisi, dan memperbarui status pekerjaan hingga dinyatakan selesai.',
+                  l10n.handlingFlowBody,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.42,
-                      ),
+                    color: AppColors.textSecondary,
+                    height: 1.42,
+                  ),
                 ),
               ],
             ),
@@ -435,9 +421,7 @@ class _ServiceInformationCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-  });
+  const _SectionHeader({required this.title});
 
   final String title;
 
@@ -446,10 +430,10 @@ class _SectionHeader extends StatelessWidget {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.navy,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.2,
-          ),
+        color: AppColors.navy,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.2,
+      ),
     );
   }
 }

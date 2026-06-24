@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -30,8 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
       widget.authStorageService ?? AuthStorageService();
 
   late final ApiService _apiService =
-      widget.apiService ??
-      ApiService(authStorageService: _authStorageService);
+      widget.apiService ?? ApiService(authStorageService: _authStorageService);
 
   @override
   void initState() {
@@ -115,15 +113,15 @@ class _SplashScreenState extends State<SplashScreen> {
                       const SizedBox(height: 28),
 
                       Text(
-                        'APARTHUB',
-                        textAlign: TextAlign.center,
-                        style:
-                            Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            'APARTHUB',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 1.2,
                                 ),
-                      )
+                          )
                           .animate()
                           .fadeIn(duration: 500.ms)
                           .moveY(begin: 12, end: 0),
@@ -134,13 +132,10 @@ class _SplashScreenState extends State<SplashScreen> {
                         'Integrated Apartment\nManagement Platform',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppColors.textSecondary,
-                              height: 1.4,
-                            ),
-                      ).animate().fadeIn(
-                            delay: 180.ms,
-                            duration: 500.ms,
-                          ),
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ).animate().fadeIn(delay: 180.ms, duration: 500.ms),
 
                       const SizedBox(height: 32),
 
@@ -175,10 +170,7 @@ class _SplashScreenState extends State<SplashScreen> {
                             ),
                           ],
                         ),
-                      ).animate().fadeIn(
-                            delay: 280.ms,
-                            duration: 450.ms,
-                          ),
+                      ).animate().fadeIn(delay: 280.ms, duration: 450.ms),
 
                       const SizedBox(height: 40),
 
@@ -186,16 +178,11 @@ class _SplashScreenState extends State<SplashScreen> {
                         width: 88,
                         child: LinearProgressIndicator(
                           minHeight: 4,
-                          borderRadius: BorderRadius.all(
-                            Radius.circular(99),
-                          ),
+                          borderRadius: BorderRadius.all(Radius.circular(99)),
                           backgroundColor: AppColors.borderSoft,
                           color: AppColors.gold,
                         ),
-                      ).animate().fadeIn(
-                            delay: 360.ms,
-                            duration: 450.ms,
-                          ),
+                      ).animate().fadeIn(delay: 360.ms, duration: 450.ms),
 
                       const SizedBox(height: 16),
 
@@ -203,13 +190,10 @@ class _SplashScreenState extends State<SplashScreen> {
                         'Memverifikasi sesi akun Anda...',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ).animate().fadeIn(
-                            delay: 420.ms,
-                            duration: 450.ms,
-                          ),
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ).animate().fadeIn(delay: 420.ms, duration: 450.ms),
                     ],
                   ),
                 ),
@@ -306,4 +290,3 @@ class _SplashDecorations extends StatelessWidget {
     );
   }
 }
-

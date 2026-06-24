@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/service_request_models.dart';
 import '../../../services/api_service.dart';
 import 'widgets/service_attachment_section.dart';
@@ -42,6 +44,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     'History',
   ];
   static const _priorities = ['Low', 'Medium', 'High', 'Emergency'];
+  static const _desktopImageTypes = XTypeGroup(
+    label: 'Images',
+    extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'heic', 'heif'],
+  );
 
   late final ApiService _apiService = widget.apiService ?? ApiService();
   late final TextEditingController _titleController;
@@ -65,6 +71,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   var _isLoadingHistory = false;
   var _isSubmitting = false;
   String? _errorMessage;
+
+  bool get _usesDesktopFilePicker => Platform.isWindows;
 
   @override
   void initState() {
@@ -295,8 +303,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Future<void> _showAttachmentSourcePicker() async {
+    final l10n = AppLocalizations.of(context);
+
     if (_attachmentPaths.length >= 3) {
-      _showServiceSnack('Maksimal 3 lampiran foto per request.');
+      _showServiceSnack(l10n.maxPhotoAttachments);
       return;
     }
 
@@ -313,7 +323,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Add Attachment',
+                    l10n.addAttachment,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: AppColors.navy,
                       fontWeight: FontWeight.w900,
@@ -321,31 +331,46 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Choose a photo source for your service request.',
+                    _usesDesktopFilePicker
+                        ? l10n.choosePhotoComputer
+                        : l10n.choosePhotoSource,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),
-                  _AttachmentSourceTile(
-                    key: const ValueKey('attachment-source-camera'),
-                    icon: Icons.photo_camera_outlined,
-                    title: 'Camera',
-                    subtitle: 'Capture a new issue photo',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _pickAttachment(ImageSource.camera);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  _AttachmentSourceTile(
-                    key: const ValueKey('attachment-source-gallery'),
-                    icon: Icons.photo_library_outlined,
-                    title: 'Gallery',
-                    subtitle: 'Choose an existing photo',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _pickAttachment(ImageSource.gallery);
-                    },
-                  ),
+                  if (_usesDesktopFilePicker)
+                    _AttachmentSourceTile(
+                      key: const ValueKey('attachment-source-file'),
+                      icon: Icons.folder_open_outlined,
+                      title: l10n.choosePhoto,
+                      subtitle: l10n.browsePhoto,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _pickAttachment(ImageSource.gallery);
+                      },
+                    )
+                  else ...[
+                    _AttachmentSourceTile(
+                      key: const ValueKey('attachment-source-camera'),
+                      icon: Icons.photo_camera_outlined,
+                      title: l10n.camera,
+                      subtitle: l10n.capturePhoto,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _pickAttachment(ImageSource.camera);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _AttachmentSourceTile(
+                      key: const ValueKey('attachment-source-gallery'),
+                      icon: Icons.photo_library_outlined,
+                      title: l10n.gallery,
+                      subtitle: l10n.chooseExistingPhoto,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _pickAttachment(ImageSource.gallery);
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -356,28 +381,48 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Future<void> _pickAttachment(ImageSource source) async {
+    final l10n = AppLocalizations.of(context);
+
     if (_attachmentPaths.length >= 3) {
-      _showServiceSnack('Maksimal 3 lampiran foto per request.');
+      _showServiceSnack(l10n.maxPhotoAttachments);
       return;
     }
 
-    final pickedPath =
-        await widget.attachmentPicker?.call(source) ??
-        await _pickAttachmentPath(source);
+    String? pickedPath;
+    try {
+      pickedPath =
+          await widget.attachmentPicker?.call(source) ??
+          await _pickAttachmentPath(source);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showServiceSnack(l10n.photoPickFailed);
+      return;
+    }
+
     if (!mounted || pickedPath == null || pickedPath.trim().isEmpty) {
       return;
     }
 
+    final selectedPath = pickedPath.trim();
     setState(() {
-      if (_attachmentPaths.contains(pickedPath) ||
+      if (_attachmentPaths.contains(selectedPath) ||
           _attachmentPaths.length >= 3) {
         return;
       }
-      _attachmentPaths = [..._attachmentPaths, pickedPath];
+      _attachmentPaths = [..._attachmentPaths, selectedPath];
     });
   }
 
   Future<String?> _pickAttachmentPath(ImageSource source) async {
+    if (_usesDesktopFilePicker) {
+      final pickedFile = await openFile(
+        acceptedTypeGroups: const [_desktopImageTypes],
+      );
+      return pickedFile?.path;
+    }
+
     final pickedFile = await _imagePicker.pickImage(
       source: source,
       imageQuality: 82,
@@ -396,6 +441,15 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final steps = [
+      l10n.createServiceRequest.split(' ').first,
+      l10n.describeIssue,
+      l10n.status,
+      l10n.trackingDetail,
+      l10n.serviceHistory,
+    ];
+
     return ListView(
       key: const ValueKey('service-request-page'),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 128),
@@ -404,7 +458,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         const SizedBox(height: 14),
         ServiceStepIndicator(
           currentStep: _serviceStep,
-          steps: _steps,
+          steps: steps,
           onStepSelected: _handleStepSelected,
         ),
         const SizedBox(height: 16),
@@ -428,11 +482,13 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         IconButton(
-          tooltip: 'Back',
+          tooltip: l10n.back,
           onPressed: _serviceStep == 0 || _serviceStep == 4
               ? widget.onBack
               : () => _goToStep(_serviceStep - 1),
@@ -446,7 +502,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Service Request',
+          l10n.serviceRequest,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: AppColors.navy,
             fontWeight: FontWeight.w900,
@@ -472,8 +528,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildCreateRequest() {
+    final l10n = AppLocalizations.of(context);
+
     if (_isLoadingCatalog) {
-      return const _LoadingStateCard(message: 'Loading service catalog...');
+      return _LoadingStateCard(message: l10n.loadingServiceCatalog);
     }
 
     if (_catalog == null && _errorMessage != null) {
@@ -482,17 +540,14 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
     final catalog = _catalog;
     if (catalog == null) {
-      return _ErrorStateCard(
-        message: 'Data layanan belum bisa dimuat. Coba lagi.',
-        onRetry: _loadCatalog,
-      );
+      return _ErrorStateCard(message: l10n.failedToLoad, onRetry: _loadCatalog);
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'What type of service do you need?',
+          l10n.whatServiceNeeded,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             color: AppColors.navy,
             fontWeight: FontWeight.w900,
@@ -502,7 +557,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         for (final category in catalog.categories)
           _ServiceCategoryCard(
             title: category.name,
-            subtitle: '${category.subcategories.length} service options',
+            subtitle: '${category.subcategories.length} ${l10n.serviceOptions}',
             icon: _categoryIcon(category.name),
             selected: _selectedCategory?.id == category.id,
             onTap: () {
@@ -519,7 +574,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Choose a specific service option',
+                  l10n.chooseSpecificService,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: AppColors.navy,
                     fontWeight: FontWeight.w900,
@@ -541,7 +596,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   ),
                 _PrimaryStateButton(
                   buttonKey: const ValueKey('continue-to-description-button'),
-                  label: 'Continue to Description',
+                  label: l10n.continueToDescription,
                   enabled: _selectedSubcategory != null,
                   onPressed: () => _goToStep(1),
                 ),
@@ -554,6 +609,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildDescribeIssue() {
+    final l10n = AppLocalizations.of(context);
     final subcategory = _selectedSubcategory;
     final slaMinutes = subcategory?.sla.minutesForPriority(_priority) ?? 0;
 
@@ -561,10 +617,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-            title: 'Describe Issue',
-            subtitle:
-                'Provide issue details, a preferred schedule note, and supporting photos.',
+          _CardTitle(
+            title: l10n.describeIssue,
+            subtitle: l10n.describeIssueSubtitle,
             icon: Icons.edit_note_outlined,
           ),
           const SizedBox(height: 16),
@@ -585,7 +640,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           TextField(
             key: const ValueKey('service-title-field'),
             controller: _titleController,
-            decoration: const InputDecoration(labelText: 'Problem title'),
+            decoration: InputDecoration(labelText: l10n.problemTitle),
           ),
           const SizedBox(height: 10),
           TextField(
@@ -593,11 +648,11 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
             controller: _descriptionController,
             minLines: 4,
             maxLines: 5,
-            decoration: const InputDecoration(labelText: 'Problem description'),
+            decoration: InputDecoration(labelText: l10n.problemDescription),
           ),
           const SizedBox(height: 14),
           Text(
-            'Priority',
+            l10n.priority,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: AppColors.navy,
               fontWeight: FontWeight.w900,
@@ -613,7 +668,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
             const SizedBox(height: 14),
             _InfoPanel(
               icon: Icons.timer_outlined,
-              title: 'Estimated SLA',
+              title: l10n.estimatedSla,
               subtitle: '$slaMinutes minutes for $_priority priority',
               status: 'Open',
             ),
@@ -628,8 +683,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
             controller: _preferredScheduleController,
             minLines: 2,
             maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Preferred schedule note',
+            decoration: InputDecoration(
+              labelText: l10n.preferredScheduleNote,
               hintText: 'Example: Morning after 09:00 or after office hours',
             ),
           ),
@@ -642,7 +697,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           const SizedBox(height: 16),
           LuxuryButton(
             key: const ValueKey('submit-service-request-button'),
-            label: _isSubmitting ? 'Submitting...' : 'Submit Request',
+            label: _isSubmitting ? l10n.submitting : l10n.submitRequest,
             icon: Icons.send_outlined,
             onPressed: _submitRequest,
           ),
@@ -652,10 +707,11 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildRequestSubmitted() {
+    final l10n = AppLocalizations.of(context);
     final ticket = _createdTicket;
     if (ticket == null) {
       return _ErrorStateCard(
-        message: 'Service request belum tersedia. Coba kirim ulang.',
+        message: l10n.serviceRequestUnavailable,
         onRetry: () => _goToStep(1),
       );
     }
@@ -667,7 +723,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           const _SuccessIcon(icon: Icons.send_outlined),
           const SizedBox(height: 18),
           Text(
-            'Ticket Created!',
+            l10n.ticketCreated,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: AppColors.success,
               fontWeight: FontWeight.w900,
@@ -675,32 +731,32 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Your service request has been submitted successfully.',
+            l10n.ticketSubmittedSuccess,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 18),
           _DetailPanel(
             rows: [
-              ('Ticket Number', ticket.ticketNumber),
-              ('Status', ticket.status),
-              ('Priority', ticket.priority),
-              ('Category', ticket.category.displayLabel),
-              ('Subcategory', ticket.subcategory.displayLabel),
-              if (ticket.slaState.isNotEmpty) ('SLA State', ticket.slaState),
+              (l10n.ticketNumber, ticket.ticketNumber),
+              (l10n.status, ticket.status),
+              (l10n.priority, ticket.priority),
+              (l10n.category, ticket.category.displayLabel),
+              (l10n.subcategory, ticket.subcategory.displayLabel),
+              if (ticket.slaState.isNotEmpty) (l10n.slaState, ticket.slaState),
               if (ticket.slaDueAt.isNotEmpty)
-                ('SLA Due', _formatDateTime(ticket.slaDueAt)),
+                (l10n.slaDue, _formatDateTime(ticket.slaDueAt)),
             ],
           ),
           const SizedBox(height: 18),
           LuxuryButton(
-            label: 'View Detail',
+            label: l10n.viewDetail,
             icon: Icons.visibility_outlined,
             onPressed: () => _openTracking(ticket),
           ),
           const SizedBox(height: 10),
           _OutlineActionButton(
-            label: 'View History',
+            label: l10n.viewHistory,
             icon: Icons.history_outlined,
             onPressed: () => _loadHistory(openHistory: true),
           ),
@@ -710,10 +766,11 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildTrackingStep() {
+    final l10n = AppLocalizations.of(context);
     final ticket = _trackingTicket ?? _createdTicket;
     if (ticket == null) {
       return _ErrorStateCard(
-        message: 'Detail ticket belum tersedia. Coba buka dari riwayat.',
+        message: l10n.ticketDetailUnavailable,
         onRetry: () => _loadHistory(openHistory: true),
       );
     }
@@ -722,9 +779,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-            title: 'Tracking Detail',
-            subtitle: 'Real-time status and service ticket information.',
+          _CardTitle(
+            title: l10n.trackingDetail,
+            subtitle: l10n.realTimeTicketInfo,
             icon: Icons.track_changes_outlined,
           ),
           const SizedBox(height: 18),
@@ -753,30 +810,30 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           const SizedBox(height: 18),
           _DetailPanel(
             rows: [
-              ('Ticket Number', ticket.ticketNumber),
-              ('Category', ticket.category.displayLabel),
-              ('Subcategory', ticket.subcategory.displayLabel),
-              ('Priority', ticket.priority),
+              (l10n.ticketNumber, ticket.ticketNumber),
+              (l10n.category, ticket.category.displayLabel),
+              (l10n.subcategory, ticket.subcategory.displayLabel),
+              (l10n.priority, ticket.priority),
               (
-                'Assigned To',
+                l10n.assignedTo,
                 ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo,
               ),
-              ('Created At', _formatDateTime(ticket.createdAt)),
+              (l10n.createdAt, _formatDateTime(ticket.createdAt)),
               (
-                'Operational Time',
+                l10n.operationalTime,
                 ticket.operationalTimestamp.isEmpty
                     ? '-'
                     : _formatDateTime(ticket.operationalTimestamp),
               ),
               (
-                'SLA Due',
+                l10n.slaDue,
                 ticket.slaDueAt.isEmpty
                     ? '-'
                     : _formatDateTime(ticket.slaDueAt),
               ),
-              ('SLA State', ticket.slaState.isEmpty ? '-' : ticket.slaState),
+              (l10n.slaState, ticket.slaState.isEmpty ? '-' : ticket.slaState),
               (
-                'Completed At',
+                l10n.completedAt,
                 ticket.completedAt.isEmpty
                     ? '-'
                     : _formatDateTime(ticket.completedAt),
@@ -785,7 +842,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Attachments',
+            l10n.attachments,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: AppColors.navy,
               fontWeight: FontWeight.w900,
@@ -794,12 +851,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           const SizedBox(height: 10),
           ServiceAttachmentSection(
             attachments: ticket.attachments,
-            emptyMessage: 'No file attachments',
+            emptyMessage: l10n.noFileAttachments,
             onPreviewTap: _showAttachmentPreview,
           ),
           const SizedBox(height: 16),
           Text(
-            'Timeline',
+            l10n.timeline,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: AppColors.navy,
               fontWeight: FontWeight.w900,
@@ -807,7 +864,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           ),
           const SizedBox(height: 10),
           if (ticket.timeline.isEmpty)
-            const _EmptyStateText(text: 'No timeline updates available yet.')
+            _EmptyStateText(text: l10n.noTimelineUpdates)
           else
             for (final item in ticket.timeline)
               Padding(
@@ -816,7 +873,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               ),
           const SizedBox(height: 18),
           LuxuryButton(
-            label: 'View History',
+            label: l10n.viewHistory,
             icon: Icons.history_outlined,
             onPressed: () => _loadHistory(openHistory: true),
           ),
@@ -826,8 +883,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _buildTicketHistory() {
+    final l10n = AppLocalizations.of(context);
+
     if (_isLoadingHistory) {
-      return const _LoadingStateCard(message: 'Loading service history...');
+      return _LoadingStateCard(message: l10n.loadingServiceHistory);
     }
 
     if (_tickets.isEmpty && _errorMessage != null) {
@@ -845,9 +904,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _CardTitle(
-                title: 'Service History',
-                subtitle: 'Review every service request and its progress.',
+              _CardTitle(
+                title: l10n.serviceHistory,
+                subtitle: l10n.serviceHistoryCardSubtitle,
                 icon: Icons.history_outlined,
               ),
               const SizedBox(height: 16),
@@ -861,10 +920,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         ),
         const SizedBox(height: 14),
         if (tickets.isEmpty)
-          const WhitePremiumCard(
-            child: _EmptyStateText(
-              text: 'No service requests found for this filter.',
-            ),
+          WhitePremiumCard(
+            child: _EmptyStateText(text: l10n.noServiceRequestsFound),
           ),
         for (final ticket in tickets)
           Padding(
@@ -898,7 +955,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${ticket.priority} • ${ticket.slaState.isEmpty ? 'SLA not available' : ticket.slaState}',
+                          '${ticket.priority} • ${ticket.slaState.isEmpty ? l10n.slaNotAvailable : ticket.slaState}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 8),
@@ -908,7 +965,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Assigned to: ${ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo}',
+                          '${l10n.assignedTo}: ${ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -920,10 +977,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               ),
             ),
           ),
-        TextButton(
-          onPressed: widget.onBack,
-          child: const Text('Back to Services'),
-        ),
+        TextButton(onPressed: widget.onBack, child: Text(l10n.backToServices)),
       ],
     );
   }
@@ -934,6 +988,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final l10n = AppLocalizations.of(context);
+
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -988,32 +1044,32 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     const SizedBox(height: 16),
                     _DetailPanel(
                       rows: [
-                        ('Ticket Number', ticket.ticketNumber),
-                        ('Category', ticket.category.displayLabel),
-                        ('Subcategory', ticket.subcategory.displayLabel),
+                        (l10n.ticketNumber, ticket.ticketNumber),
+                        (l10n.category, ticket.category.displayLabel),
+                        (l10n.subcategory, ticket.subcategory.displayLabel),
                         (
-                          'Assigned To',
+                          l10n.assignedTo,
                           ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo,
                         ),
-                        ('Created At', _formatDateTime(ticket.createdAt)),
+                        (l10n.createdAt, _formatDateTime(ticket.createdAt)),
                         (
-                          'Operational Time',
+                          l10n.operationalTime,
                           ticket.operationalTimestamp.isEmpty
                               ? '-'
                               : _formatDateTime(ticket.operationalTimestamp),
                         ),
                         (
-                          'SLA Due',
+                          l10n.slaDue,
                           ticket.slaDueAt.isEmpty
                               ? '-'
                               : _formatDateTime(ticket.slaDueAt),
                         ),
                         (
-                          'SLA State',
+                          l10n.slaState,
                           ticket.slaState.isEmpty ? '-' : ticket.slaState,
                         ),
                         (
-                          'Completed At',
+                          l10n.completedAt,
                           ticket.completedAt.isEmpty
                               ? '-'
                               : _formatDateTime(ticket.completedAt),
@@ -1022,7 +1078,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Attachments',
+                      l10n.attachments,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: AppColors.navy,
                         fontWeight: FontWeight.w900,
@@ -1035,7 +1091,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     ),
                     const SizedBox(height: 16),
                     LuxuryButton(
-                      label: 'Close',
+                      label: l10n.close,
                       icon: Icons.check_rounded,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -1117,6 +1173,8 @@ class _ErrorStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -1133,7 +1191,7 @@ class _ErrorStateCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           LuxuryButton(
-            label: 'Retry',
+            label: l10n.retry,
             icon: Icons.refresh_rounded,
             onPressed: onRetry,
           ),
@@ -1369,11 +1427,13 @@ class _PhotoUploadRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Attachments',
+          l10n.attachments,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             color: AppColors.navy,
             fontWeight: FontWeight.w900,
@@ -1381,7 +1441,7 @@ class _PhotoUploadRow extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Optional photos to help the service team understand the issue faster.',
+          l10n.optionalPhotosDescription,
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
@@ -1527,7 +1587,7 @@ class _AttachmentAddCard extends StatelessWidget {
               const Icon(Icons.add_a_photo_outlined, color: AppColors.gold),
               const SizedBox(height: 8),
               Text(
-                'Add photo',
+                AppLocalizations.of(context).addPhoto,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: AppColors.navy,
                   fontWeight: FontWeight.w800,
@@ -1626,6 +1686,8 @@ class _AutomaticScheduleNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(14),
@@ -1639,7 +1701,7 @@ class _AutomaticScheduleNotice extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Schedule is set automatically',
+                  l10n.scheduleAutomaticTitle,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: AppColors.navy,
                     fontWeight: FontWeight.w900,
@@ -1647,7 +1709,7 @@ class _AutomaticScheduleNotice extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Visit date and service time are arranged by management/backend, so residents only need to add notes if there is a preferred timing request.',
+                  l10n.scheduleAutomaticBody,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                     height: 1.45,

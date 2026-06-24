@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/luxury_background.dart';
 import '../../core/widgets/luxury_button.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../services/api_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -41,18 +41,19 @@ class _LoginPageState extends State<LoginPage> {
 
     final inputLogin = _loginController.text.trim();
     final inputPassword = _passwordController.text;
+    final l10n = AppLocalizations.of(context);
 
     if (inputLogin.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login tidak boleh kosong.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.loginRequired)));
       return;
     }
 
     if (inputPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password tidak boleh kosong.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.passwordRequired)));
       return;
     }
 
@@ -76,7 +77,7 @@ class _LoginPageState extends State<LoginPage> {
 
       final message = error is ApiServiceException
           ? error.message
-          : 'Login gagal. Periksa kembali akun dan password Anda.';
+          : l10n.loginFailed;
 
       ScaffoldMessenger.of(
         context,
@@ -118,13 +119,13 @@ class _LoginPageState extends State<LoginPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
                 child: Text(
-                  'Akses resident dilindungi dan akan diverifikasi sebelum dashboard dapat digunakan.',
+                  AppLocalizations.of(context).secureResidentAccess,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w700,
-                        height: 1.4,
-                      ),
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
                 ),
               ).animate().fadeIn(delay: 340.ms, duration: 360.ms),
             ],
@@ -154,6 +155,8 @@ class _LoginHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return SizedBox(
       height: 500,
       child: Stack(
@@ -164,11 +167,7 @@ class _LoginHero extends StatelessWidget {
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.navy,
-                  Color(0xFF103B86),
-                  AppColors.blue,
-                ],
+                colors: [AppColors.navy, Color(0xFF103B86), AppColors.blue],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -230,20 +229,20 @@ class _LoginHero extends StatelessWidget {
                       children: [
                         Text(
                           'APARTHUB RESIDENCE',
-                          style:
-                              Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.7,
-                                  ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.7,
+                              ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Resident Digital Platform',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.78),
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.78),
+                              ),
                         ),
                       ],
                     ),
@@ -263,16 +262,16 @@ class _LoginHero extends StatelessWidget {
                 Text(
                   'Welcome Back',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 7),
                 Text(
                   'Masuk untuk mengakses layanan hunian Anda.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.84),
-                      ),
+                    color: Colors.white.withValues(alpha: 0.84),
+                  ),
                 ),
               ],
             ),
@@ -289,22 +288,22 @@ class _LoginHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Masuk ke Akun Anda',
+                    l10n.login,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.navy,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     'Gunakan akun resident yang telah terdaftar.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 22),
 
-                  const _InputLabel(text: 'EMAIL ATAU NOMOR PONSEL'),
+                  _InputLabel(text: l10n.email.toUpperCase()),
                   const SizedBox(height: 8),
 
                   TextField(
@@ -315,15 +314,15 @@ class _LoginHero extends StatelessWidget {
                       AutofillHints.username,
                       AutofillHints.email,
                     ],
-                    decoration: const InputDecoration(
-                      hintText: 'Masukkan email atau nomor ponsel',
-                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    decoration: InputDecoration(
+                      hintText: l10n.email,
+                      prefixIcon: const Icon(Icons.person_outline_rounded),
                     ),
                   ),
 
                   const SizedBox(height: 18),
 
-                  const _InputLabel(text: 'PASSWORD'),
+                  _InputLabel(text: l10n.password.toUpperCase()),
                   const SizedBox(height: 8),
 
                   TextField(
@@ -334,7 +333,7 @@ class _LoginHero extends StatelessWidget {
                     autofillHints: const [AutofillHints.password],
                     onSubmitted: (_) => onLogin(),
                     decoration: InputDecoration(
-                      hintText: 'Masukkan password',
+                      hintText: l10n.password,
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
                       suffixIcon: IconButton(
                         tooltip: isPasswordVisible
@@ -358,9 +357,7 @@ class _LoginHero extends StatelessWidget {
                       opacity: isLoading ? 0.72 : 1,
                       child: LuxuryButton(
                         key: const ValueKey('login-button'),
-                        label: isLoading
-                            ? 'Signing In...'
-                            : 'MASUK',
+                        label: isLoading ? l10n.signingIn : l10n.signIn,
                         icon: isLoading
                             ? Icons.hourglass_top_rounded
                             : Icons.login_rounded,
@@ -381,14 +378,14 @@ class _LoginHero extends StatelessWidget {
 class _LoginSecurityNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppColors.blueSoft,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppColors.navy.withValues(alpha: 0.10),
-        ),
+        border: Border.all(color: AppColors.navy.withValues(alpha: 0.10)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,25 +403,25 @@ class _LoginSecurityNotice extends StatelessWidget {
               size: 22,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Akses Aman',
+                  l10n.secureAccessTitle,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Data resident dan aktivitas akun diproses melalui sesi terautentikasi.',
+                  l10n.secureResidentAccess,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.35,
-                      ),
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -445,10 +442,10 @@ class _InputLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.35,
-          ),
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.35,
+      ),
     );
   }
 }

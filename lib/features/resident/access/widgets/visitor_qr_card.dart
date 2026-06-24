@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/luxury_button.dart';
 import '../../../../core/widgets/white_premium_card.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 
 class VisitorQrCard extends StatelessWidget {
   const VisitorQrCard({
@@ -27,6 +28,8 @@ class VisitorQrCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -115,7 +118,7 @@ class VisitorQrCard extends StatelessWidget {
           if (onShare != null) ...[
             const SizedBox(height: 14),
             LuxuryButton(
-              label: 'Share QR',
+              label: l10n.shareQr,
               icon: Icons.ios_share_outlined,
               onPressed: onShare!,
             ),

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 final _currency = NumberFormat.currency(
   locale: 'id_ID',
@@ -18,6 +19,8 @@ class BillingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return ListView(
       key: const ValueKey('billing-page'),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 128),
@@ -29,13 +32,13 @@ class BillingPage extends StatelessWidget {
                 key: const ValueKey('billing-back-button'),
                 onPressed: onBack,
                 icon: const Icon(Icons.arrow_back_rounded),
-                tooltip: 'Back',
+                tooltip: l10n.back,
               ),
               const SizedBox(width: 8),
             ],
             Expanded(
               child: Text(
-                'Billing',
+                l10n.billing,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -45,7 +48,7 @@ class BillingPage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Track dues, installment timelines, and premium building services.',
+          l10n.billingSubtitle,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 18),
@@ -54,7 +57,7 @@ class BillingPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Total outstanding',
+                l10n.totalOutstanding,
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
@@ -67,10 +70,10 @@ class BillingPage extends StatelessWidget {
                 ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
-              const _StatusPill(label: 'Due in 6 days'),
+              _StatusPill(label: l10n.dueInSixDays),
               const SizedBox(height: 18),
               LuxuryButton(
-                label: 'Pay this month invoice',
+                label: l10n.payThisMonthInvoice,
                 icon: Icons.payments_rounded,
                 onPressed: () {},
               ),
@@ -78,14 +81,14 @@ class BillingPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const _InvoiceTile(
-          title: 'Service Charge',
+        _InvoiceTile(
+          title: l10n.serviceCharge,
           dueDate: '25 Jun 2026',
           amount: 'Rp 1.650.000',
         ),
         const SizedBox(height: 12),
-        const _InvoiceTile(
-          title: 'Facility Maintenance',
+        _InvoiceTile(
+          title: l10n.facilityMaintenance,
           dueDate: '25 Jun 2026',
           amount: 'Rp 1.200.000',
         ),
@@ -107,6 +110,8 @@ class _InvoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Row(
         children: [
@@ -135,7 +140,7 @@ class _InvoiceTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Due $dueDate',
+                  '${l10n.due} $dueDate',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],

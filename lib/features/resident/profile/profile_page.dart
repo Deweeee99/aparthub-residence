@@ -5,14 +5,23 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/resident_user.dart';
 import '../../../services/api_service.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key, this.apiService, this.resident});
+  const ProfilePage({
+    super.key,
+    this.apiService,
+    this.resident,
+    this.currentLocale = const Locale('id'),
+    this.onLocaleChanged,
+  });
 
   final ApiService? apiService;
   final ResidentUser? resident;
+  final Locale currentLocale;
+  final ValueChanged<Locale>? onLocaleChanged;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -41,6 +50,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final resident = widget.resident;
     final residentName = _profileName(resident);
     final residentType = _profileResidentType(resident);
@@ -48,40 +58,40 @@ class _ProfilePageState extends State<ProfilePage> {
     final towerFloorLabel = _profileTowerFloor(resident);
     final emailLabel = _profileValue(
       resident?.email,
-      fallback: 'Not provided',
+      fallback: l10n.notProvided,
     );
     final phoneLabel = _profileValue(
       resident?.mobileNo,
-      fallback: 'Not provided',
+      fallback: l10n.notProvided,
     );
     final contractLabel = _profileContractEndDate(resident);
-    final residentIdLabel = resident == null ? 'Pending sync' : '#${resident.id}';
+    final residentIdLabel = resident == null
+        ? l10n.pendingSync
+        : '#${resident.id}';
 
     final hasUnit = resident?.unit.code.trim().isNotEmpty == true;
 
     final profileActions = [
       _ProfileAction(
         icon: Icons.notifications_none_rounded,
-        title: 'Notifications',
-        subtitle: 'Building alerts, visitor pass, service updates',
+        title: l10n.notifications,
+        subtitle: l10n.emailUpdates,
       ),
       _ProfileAction(
         icon: Icons.privacy_tip_outlined,
-        title: 'Privacy',
-        subtitle: 'Profile visibility and contact preferences',
+        title: l10n.privacy,
+        subtitle: l10n.privacySubtitle,
       ),
       _ProfileAction(
         icon: Icons.support_agent_rounded,
-        title: 'Help Center',
-        subtitle: 'Concierge support and resident assistance',
+        title: l10n.helpCenter,
+        subtitle: l10n.helpCenterSubtitle,
       ),
     ];
 
     void showDemoSnack(String label) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$label is simulated for demo.'),
-        ),
+        SnackBar(content: Text('$label ${l10n.simulatedForDemo}')),
       );
     }
 
@@ -97,13 +107,12 @@ class _ProfilePageState extends State<ProfilePage> {
           residentIdLabel: residentIdLabel,
           contractLabel: contractLabel,
           hasUnit: hasUnit,
+          profileLabel: l10n.residentProfile,
         ),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-          child: _SectionHeader(
-            title: 'IDENTITAS PENGHUNI',
-          ),
+          child: _SectionHeader(title: l10n.residentIdentity.toUpperCase()),
         ),
 
         Padding(
@@ -120,13 +129,19 @@ class _ProfilePageState extends State<ProfilePage> {
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
-          child: _SectionHeader(
-            title: 'PENGATURAN AKUN',
-          ),
+          child: _SectionHeader(title: l10n.accountSettings.toUpperCase()),
         ),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: _LanguagePreferenceCard(
+            currentLocale: widget.currentLocale,
+            onLocaleChanged: widget.onLocaleChanged,
+          ),
+        ),
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: Column(
             children: [
               for (var index = 0; index < profileActions.length; index++) ...[
@@ -143,17 +158,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-          child: _SectionHeader(
-            title: 'AKUN',
-          ),
+          child: _SectionHeader(title: l10n.account.toUpperCase()),
         ),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
           child: LuxuryButton(
-            label: 'Edit Profile',
+            label: l10n.editProfile,
             icon: Icons.edit_outlined,
-            onPressed: () => showDemoSnack('Edit Profile'),
+            onPressed: () => showDemoSnack(l10n.editProfile),
           ),
         ),
 
@@ -165,7 +178,7 @@ class _ProfilePageState extends State<ProfilePage> {
               opacity: _isLoggingOut ? 0.72 : 1,
               child: LuxuryButton(
                 key: const ValueKey('logout-button'),
-                label: _isLoggingOut ? 'Signing Out...' : 'Logout',
+                label: _isLoggingOut ? l10n.signingOut : l10n.logout,
                 icon: Icons.logout_rounded,
                 danger: true,
                 variant: LuxuryButtonVariant.secondary,
@@ -188,6 +201,7 @@ class _ProfileHero extends StatelessWidget {
     required this.residentIdLabel,
     required this.contractLabel,
     required this.hasUnit,
+    required this.profileLabel,
   });
 
   final ResidentUser? resident;
@@ -197,6 +211,7 @@ class _ProfileHero extends StatelessWidget {
   final String residentIdLabel;
   final String contractLabel;
   final bool hasUnit;
+  final String profileLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -210,11 +225,7 @@ class _ProfileHero extends StatelessWidget {
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.navy,
-                  Color(0xFF103B86),
-                  AppColors.blue,
-                ],
+                colors: [AppColors.navy, Color(0xFF103B86), AppColors.blue],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -248,9 +259,7 @@ class _ProfileHero extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ProfileAvatar(
-                    initials: _profileInitials(resident),
-                  ),
+                  _ProfileAvatar(initials: _profileInitials(resident)),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Padding(
@@ -259,7 +268,7 @@ class _ProfileHero extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Resident Profile',
+                            profileLabel,
                             style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
                                   color: Colors.white.withValues(alpha: 0.78),
@@ -314,9 +323,7 @@ class _ProfileHero extends StatelessWidget {
 }
 
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
-    required this.initials,
-  });
+  const _ProfileAvatar({required this.initials});
 
   final String initials;
 
@@ -337,9 +344,9 @@ class _ProfileAvatar extends StatelessWidget {
       child: Text(
         initials,
         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppColors.navy,
-              fontWeight: FontWeight.w900,
-            ),
+          color: AppColors.navy,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -360,6 +367,8 @@ class _ProfileSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -389,53 +398,44 @@ class _ProfileSummaryCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.navy,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       residentIdLabel,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
               _StatusIcon(
-                icon: hasUnit
-                    ? Icons.verified_rounded
-                    : Icons.pending_outlined,
+                icon: hasUnit ? Icons.verified_rounded : Icons.pending_outlined,
                 color: hasUnit ? AppColors.success : AppColors.gold,
               ),
             ],
           ),
           const SizedBox(height: 15),
-          Container(
-            height: 1,
-            color: AppColors.borderSoft,
-          ),
+          Container(height: 1, color: AppColors.borderSoft),
           const SizedBox(height: 13),
           Row(
             children: [
               Expanded(
                 child: _ProfileSummaryValue(
-                  label: 'PROFILE STATUS',
-                  value: 'Linked',
+                  label: l10n.profileStatus.toUpperCase(),
+                  value: l10n.linked,
                   color: AppColors.success,
                 ),
               ),
-              Container(
-                width: 1,
-                height: 38,
-                color: AppColors.borderSoft,
-              ),
+              Container(width: 1, height: 38, color: AppColors.borderSoft),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16),
                   child: _ProfileSummaryValue(
-                    label: 'CONTRACT END',
+                    label: l10n.contractEnd.toUpperCase(),
                     value: contractLabel,
                     color: AppColors.navy,
                   ),
@@ -450,10 +450,7 @@ class _ProfileSummaryCard extends StatelessWidget {
 }
 
 class _StatusIcon extends StatelessWidget {
-  const _StatusIcon({
-    required this.icon,
-    required this.color,
-  });
+  const _StatusIcon({required this.icon, required this.color});
 
   final IconData icon;
   final Color color;
@@ -467,11 +464,7 @@ class _StatusIcon extends StatelessWidget {
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: 21,
-      ),
+      child: Icon(icon, color: color, size: 21),
     );
   }
 }
@@ -497,9 +490,9 @@ class _ProfileSummaryValue extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textMuted,
-                fontWeight: FontWeight.w700,
-              ),
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 5),
         Text(
@@ -507,9 +500,9 @@ class _ProfileSummaryValue extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w900,
-              ),
+            color: color,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ],
     );
@@ -535,35 +528,36 @@ class _ProfileInformationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final items = [
       _ProfileInfoData(
         icon: Icons.apartment_rounded,
-        label: 'Residence',
+        label: l10n.residence,
         value: residenceLabel,
       ),
       _ProfileInfoData(
         icon: Icons.layers_rounded,
-        label: 'Tower & Floor',
+        label: l10n.towerAndFloor,
         value: towerFloorLabel,
       ),
       _ProfileInfoData(
         icon: Icons.mail_outline_rounded,
-        label: 'Email',
+        label: l10n.email,
         value: emailLabel,
       ),
       _ProfileInfoData(
         icon: Icons.phone_outlined,
-        label: 'Phone',
+        label: l10n.phone,
         value: phoneLabel,
       ),
       _ProfileInfoData(
         icon: Icons.calendar_month_outlined,
-        label: 'Contract End',
+        label: l10n.contractEnd,
         value: contractLabel,
       ),
       _ProfileInfoData(
         icon: Icons.badge_outlined,
-        label: 'Resident ID',
+        label: l10n.residentId,
         value: residentIdLabel,
       ),
     ];
@@ -580,10 +574,7 @@ class _ProfileInformationCard extends StatelessWidget {
             ),
             if (index < items.length - 1) ...[
               const SizedBox(height: 13),
-              Container(
-                height: 1,
-                color: AppColors.borderSoft,
-              ),
+              Container(height: 1, color: AppColors.borderSoft),
               const SizedBox(height: 13),
             ],
           ],
@@ -628,11 +619,7 @@ class _InfoRow extends StatelessWidget {
             color: AppColors.goldSoft,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Icon(
-            icon,
-            color: AppColors.gold,
-            size: 20,
-          ),
+          child: Icon(icon, color: AppColors.gold, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -642,17 +629,17 @@ class _InfoRow extends StatelessWidget {
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.textMuted,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.navy,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -674,11 +661,127 @@ class _ProfileAction {
   final String subtitle;
 }
 
-class _ProfileActionTile extends StatelessWidget {
-  const _ProfileActionTile({
-    required this.action,
+class _LanguagePreferenceCard extends StatelessWidget {
+  const _LanguagePreferenceCard({
+    required this.currentLocale,
+    required this.onLocaleChanged,
+  });
+
+  final Locale currentLocale;
+  final ValueChanged<Locale>? onLocaleChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final activeLanguageCode = currentLocale.languageCode;
+
+    return WhitePremiumCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.goldSoft,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.language_rounded,
+              color: AppColors.gold,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.language,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.chooseLanguage,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _LanguageChip(
+            label: 'ID',
+            semanticLabel: l10n.indonesian,
+            selected: activeLanguageCode == 'id',
+            onTap: () => onLocaleChanged?.call(const Locale('id')),
+          ),
+          const SizedBox(width: 8),
+          _LanguageChip(
+            label: 'EN',
+            semanticLabel: l10n.english,
+            selected: activeLanguageCode == 'en',
+            onTap: () => onLocaleChanged?.call(const Locale('en')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguageChip extends StatelessWidget {
+  const _LanguageChip({
+    required this.label,
+    required this.semanticLabel,
+    required this.selected,
     required this.onTap,
   });
+
+  final String label;
+  final String semanticLabel;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: semanticLabel,
+      button: true,
+      selected: selected,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.navy : AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? AppColors.navy : AppColors.borderSoft,
+            ),
+          ),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: selected ? Colors.white : AppColors.textSecondary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileActionTile extends StatelessWidget {
+  const _ProfileActionTile({required this.action, required this.onTap});
 
   final _ProfileAction action;
   final VoidCallback onTap;
@@ -697,11 +800,7 @@ class _ProfileActionTile extends StatelessWidget {
               color: AppColors.blueSoft,
               borderRadius: BorderRadius.circular(15),
             ),
-            child: Icon(
-              action.icon,
-              color: AppColors.navy,
-              size: 23,
-            ),
+            child: Icon(action.icon, color: AppColors.navy, size: 23),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -711,9 +810,9 @@ class _ProfileActionTile extends StatelessWidget {
                 Text(
                   action.title,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -721,18 +820,15 @@ class _ProfileActionTile extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.3,
-                      ),
+                    color: AppColors.textSecondary,
+                    height: 1.3,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textMuted,
-          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
       ),
     );
@@ -740,9 +836,7 @@ class _ProfileActionTile extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-  });
+  const _SectionHeader({required this.title});
 
   final String title;
 
@@ -751,10 +845,10 @@ class _SectionHeader extends StatelessWidget {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.navy,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.2,
-          ),
+        color: AppColors.navy,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.2,
+      ),
     );
   }
 }

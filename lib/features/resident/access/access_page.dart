@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/white_premium_card.dart';
-import '../../../data/data_dummy/visitor_access_dummy.dart';
+import '../../../l10n/generated/app_localizations.dart';
+import '../../../models/resident_user.dart';
 import 'visitor_management_page.dart';
 
 enum _AccessSubview { hub, create, history }
 
 class AccessPage extends StatefulWidget {
-  const AccessPage({super.key});
+  const AccessPage({
+    super.key,
+    this.resident,
+  });
+
+  final ResidentUser? resident;
 
   @override
   State<AccessPage> createState() => _AccessPageState();
@@ -35,20 +41,21 @@ class _AccessPageState extends State<AccessPage> {
       duration: const Duration(milliseconds: 240),
       child: switch (_activeSubview) {
         _AccessSubview.create => VisitorManagementPage(
-            key: const ValueKey('visitor-create-flow'),
-            onBack: _backToHub,
-            initialMode: VisitorManagementInitialMode.create,
-          ),
+          key: const ValueKey('visitor-create-flow'),
+          onBack: _backToHub,
+          initialMode: VisitorManagementInitialMode.create,
+        ),
         _AccessSubview.history => VisitorManagementPage(
-            key: const ValueKey('visitor-history-flow'),
-            onBack: _backToHub,
-            initialMode: VisitorManagementInitialMode.history,
-          ),
+          key: const ValueKey('visitor-history-flow'),
+          onBack: _backToHub,
+          initialMode: VisitorManagementInitialMode.history,
+        ),
         _ => _AccessHub(
-            key: const ValueKey('visitor-access-hub'),
-            onCreateVisitor: _openCreateFlow,
-            onOpenHistory: _openHistory,
-          ),
+          key: const ValueKey('visitor-access-hub'),
+          resident: widget.resident,
+          onCreateVisitor: _openCreateFlow,
+          onOpenHistory: _openHistory,
+        ),
       },
     );
   }
@@ -57,15 +64,19 @@ class _AccessPageState extends State<AccessPage> {
 class _AccessHub extends StatelessWidget {
   const _AccessHub({
     super.key,
+    required this.resident,
     required this.onCreateVisitor,
     required this.onOpenHistory,
   });
 
+  final ResidentUser? resident;
   final VoidCallback onCreateVisitor;
   final VoidCallback onOpenHistory;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return ListView(
       key: const ValueKey('access-page'),
       padding: const EdgeInsets.only(bottom: 128),
@@ -74,14 +85,12 @@ class _AccessHub extends StatelessWidget {
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-          child: _ResidentUnitCard(),
+          child: _ResidentUnitCard(resident: resident),
         ),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
-          child: _SectionHeader(
-            title: 'AKSES VISITOR',
-          ),
+          child: _SectionHeader(title: l10n.visitorAccessSection.toUpperCase()),
         ),
 
         Padding(
@@ -96,20 +105,20 @@ class _AccessHub extends StatelessWidget {
             children: [
               _AccessActionCard(
                 icon: Icons.person_add_alt_1_rounded,
-                title: 'Daftarkan\nVisitor',
+                title: l10n.registerVisitor.replaceFirst(' ', '\n'),
                 subtitle: 'Buat akses dan QR pass untuk tamu.',
                 accentColor: AppColors.gold,
                 iconBackground: AppColors.goldSoft,
-                buttonLabel: 'Buat Visitor',
+                buttonLabel: l10n.registerVisitor,
                 onTap: onCreateVisitor,
               ),
               _AccessActionCard(
                 icon: Icons.history_rounded,
-                title: 'Riwayat\nVisitor',
+                title: l10n.visitorHistory.replaceFirst(' ', '\n'),
                 subtitle: 'Lihat status kunjungan dan data tamu.',
                 accentColor: AppColors.navy,
                 iconBackground: AppColors.blueSoft,
-                buttonLabel: 'Lihat Riwayat',
+                buttonLabel: l10n.viewHistory,
                 onTap: onOpenHistory,
               ),
             ],
@@ -118,14 +127,12 @@ class _AccessHub extends StatelessWidget {
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
-          child: _SectionHeader(
-            title: 'INFORMASI AKSES',
-          ),
+          child: _SectionHeader(title: l10n.accessInformation.toUpperCase()),
         ),
 
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-          child: const _AccessInformationCard(),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: _AccessInformationCard(),
         ),
       ],
     );
@@ -137,16 +144,14 @@ class _AccessHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       height: 238,
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.navy,
-            Color(0xFF103B86),
-            AppColors.blue,
-          ],
+          colors: [AppColors.navy, Color(0xFF103B86), AppColors.blue],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -199,12 +204,11 @@ class _AccessHero extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    'Visitor Access',
-                    style:
-                        Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
+                    l10n.visitorAccess,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -224,8 +228,17 @@ class _AccessHero extends StatelessWidget {
 }
 
 class _ResidentUnitCard extends StatelessWidget {
+  const _ResidentUnitCard({
+    required this.resident,
+  });
+
+  final ResidentUser? resident;
+
   @override
   Widget build(BuildContext context) {
+    final displayName = _residentDisplayName(resident);
+    final unitLabel = _residentUnitLabel(context, resident?.unit);
+
     return Transform.translate(
       offset: const Offset(0, -22),
       child: WhitePremiumCard(
@@ -251,7 +264,7 @@ class _ResidentUnitCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    VisitorAccessDummy.unitLabel,
+                    unitLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -261,7 +274,7 @@ class _ResidentUnitCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Akses visitor untuk ${VisitorAccessDummy.residentName}',
+                    'Akses visitor untuk $displayName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -317,11 +330,7 @@ class _AccessActionCard extends StatelessWidget {
               color: iconBackground,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(
-              icon,
-              color: accentColor,
-              size: 28,
-            ),
+            child: Icon(icon, color: accentColor, size: 28),
           ),
           const SizedBox(height: 14),
           Text(
@@ -360,11 +369,7 @@ class _AccessActionCard extends StatelessWidget {
                       ),
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_rounded,
-                color: accentColor,
-                size: 18,
-              ),
+              Icon(Icons.arrow_forward_rounded, color: accentColor, size: 18),
             ],
           ),
         ],
@@ -378,6 +383,8 @@ class _AccessInformationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -402,7 +409,7 @@ class _AccessInformationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Visitor QR Pass',
+                  l10n.visitorQrPass,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: AppColors.navy,
                         fontWeight: FontWeight.w900,
@@ -426,9 +433,7 @@ class _AccessInformationCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-  });
+  const _SectionHeader({required this.title});
 
   final String title;
 
@@ -443,4 +448,45 @@ class _SectionHeader extends StatelessWidget {
           ),
     );
   }
+}
+
+String _residentDisplayName(ResidentUser? resident) {
+  final name = resident?.name.trim() ?? '';
+  return name.isEmpty ? 'Resident' : name;
+}
+
+String _residentUnitLabel(BuildContext context, ResidentUnit? unit) {
+  final l10n = AppLocalizations.of(context);
+  final tower = unit?.tower.trim() ?? '';
+  final code = unit?.code.trim() ?? '';
+
+  final parts = <String>[];
+
+  if (tower.isNotEmpty) {
+    parts.add(_withLabelIfNeeded(label: l10n.tower, value: tower));
+  }
+
+  if (code.isNotEmpty) {
+    parts.add(_withLabelIfNeeded(label: l10n.unit, value: code));
+  }
+
+  if (parts.isEmpty) {
+    return 'Unit belum ditentukan';
+  }
+
+  return parts.join(' • ');
+}
+
+String _withLabelIfNeeded({
+  required String label,
+  required String value,
+}) {
+  final normalizedValue = value.toLowerCase();
+  final normalizedLabel = label.toLowerCase();
+
+  if (normalizedValue.startsWith(normalizedLabel)) {
+    return value;
+  }
+
+  return '$label $value';
 }

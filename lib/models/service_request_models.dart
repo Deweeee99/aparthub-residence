@@ -188,7 +188,7 @@ class ServiceTicketRecord {
       unit: ServiceSimpleRef.fromJson(_mapOf(source['unit'])),
       attachments: _readList(
         source['attachments'],
-        (item) => ServiceAttachment.fromJson(_mapOf(item)),
+        (item) => ServiceAttachment.fromJson(item),
       ),
       timeline: _readList(source['timeline'], (item) => _mapOf(item)),
       completedAt: _readString(source['completed_at']),
@@ -236,7 +236,18 @@ class ServiceAttachment {
   final int fileSize;
   final String url;
 
-  factory ServiceAttachment.fromJson(Map<String, dynamic>? json) {
+  factory ServiceAttachment.fromJson(dynamic json) {
+    if (json is String) {
+      final url = json.trim();
+      return ServiceAttachment(
+        id: 0,
+        fileName: _fileNameFromPath(url),
+        mimeType: '',
+        fileSize: 0,
+        url: url,
+      );
+    }
+
     final source = _mapOf(json);
     return ServiceAttachment(
       id: _readInt(source['id']),
@@ -256,6 +267,17 @@ class ServiceAttachment {
       'url': url,
     };
   }
+}
+
+String _fileNameFromPath(String value) {
+  final parsed = Uri.tryParse(value);
+  final path = parsed?.path.isNotEmpty == true ? parsed!.path : value;
+  final normalized = path.replaceAll('\\', '/');
+  final segments = normalized.split('/').where((item) => item.isNotEmpty);
+  if (segments.isEmpty) {
+    return 'Attachment';
+  }
+  return Uri.decodeComponent(segments.last);
 }
 
 class ServiceSimpleRef {

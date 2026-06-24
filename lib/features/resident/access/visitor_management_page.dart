@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
 import '../../../data/data_dummy/visitor_access_dummy.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import 'widgets/visitor_qr_card.dart';
 import 'widgets/visitor_status_badge.dart';
 import 'widgets/visitor_step_indicator.dart';
@@ -171,6 +172,17 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final steps = [
+      l10n.registerVisitor,
+      l10n.scheduleVisit,
+      'Pass',
+      'Share',
+      'Verify',
+      'Check-In',
+      l10n.visitorHistory,
+    ];
+
     return ColoredBox(
       color: Colors.transparent,
       child: ListView(
@@ -181,7 +193,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           const SizedBox(height: 18),
           VisitorStepIndicator(
             currentStep: _visitorStep,
-            steps: _steps,
+            steps: steps,
             onStepSelected: _goToStep,
           ),
           const SizedBox(height: 18),
@@ -192,11 +204,13 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         IconButton(
-          tooltip: 'Back',
+          tooltip: l10n.back,
           onPressed: _visitorStep == 0 || _visitorStep == 6
               ? widget.onBack
               : () => _goToStep(_visitorStep - 1),
@@ -210,7 +224,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Visitor Management',
+          l10n.visitorManagement,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: AppColors.navy,
             fontWeight: FontWeight.w900,
@@ -238,27 +252,29 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   Widget _buildRegisterStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeading(
-            title: 'Register Visitor',
+          _SectionHeading(
+            title: l10n.registerVisitor,
             subtitle: 'Create a secure visitor profile before arrival.',
           ),
           const SizedBox(height: 18),
           _LabeledField(
-            label: 'Visitor Name',
+            label: l10n.visitorName,
             child: _PremiumTextField(
               key: const ValueKey('visitor-name-field'),
               controller: _nameController,
-              hintText: 'Visitor full name',
+              hintText: l10n.visitorFullName,
               icon: Icons.person_outline_rounded,
             ),
           ),
           const SizedBox(height: 14),
           _LabeledField(
-            label: 'Mobile Number',
+            label: l10n.mobileNumber,
             child: _PremiumTextField(
               controller: _phoneController,
               hintText: '+62 812-3456-7890',
@@ -268,7 +284,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 14),
           _LabeledField(
-            label: 'Purpose of Visit',
+            label: l10n.purposeOfVisit,
             child: _ChoiceWrap<String>(
               options: VisitorAccessDummy.purposeOptions,
               selected: _purpose,
@@ -277,7 +293,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 14),
           _LabeledField(
-            label: 'Number of Visitors',
+            label: l10n.numberOfVisitors,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
@@ -316,7 +332,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 14),
           _LabeledField(
-            label: 'Vehicle Number (Optional)',
+            label: l10n.vehicleNumberOptional,
             child: _PremiumTextField(
               controller: _vehicleController,
               hintText: 'B 1234 ABC',
@@ -324,26 +340,28 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
             ),
           ),
           const SizedBox(height: 22),
-          LuxuryButton(label: 'Next', onPressed: _saveRegistration),
+          LuxuryButton(label: l10n.next, onPressed: _saveRegistration),
         ],
       ),
     );
   }
 
   Widget _buildScheduleStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeading(
-            title: 'Schedule Visit',
+          _SectionHeading(
+            title: l10n.scheduleVisit,
             subtitle: 'Choose visit date, time, and expected duration.',
           ),
           const SizedBox(height: 18),
           const _CalendarCard(selectedDay: 8),
           const SizedBox(height: 18),
           _LabeledField(
-            label: 'Visit Time',
+            label: l10n.visitTime,
             child: _ChoiceWrap<String>(
               options: VisitorAccessDummy.timeOptions,
               selected: _visitTime,
@@ -352,7 +370,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 14),
           _LabeledField(
-            label: 'Expected Duration',
+            label: l10n.expectedDuration,
             child: _ChoiceWrap<String>(
               options: VisitorAccessDummy.durationOptions,
               selected: _duration,
@@ -361,7 +379,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 20),
           LuxuryButton(
-            label: 'Confirm',
+            label: l10n.confirm,
             onPressed: () {
               _generatePassCode();
               _nextStep();
@@ -373,10 +391,12 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   Widget _buildPassStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       children: [
         VisitorQrCard(
-          title: 'PASS GENERATED',
+          title: l10n.passGenerated,
           code: _visitorPassCode,
           visitorName: _visitorName,
           schedule: '${VisitorAccessDummy.visitDateLabel}, $_visitTime',
@@ -388,14 +408,11 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _InfoRow(label: 'Visitor ID', value: _visitorPassCode),
-              _InfoRow(label: 'Purpose of Visit', value: _purpose),
-              const _InfoRow(
-                label: 'Unit',
-                value: VisitorAccessDummy.unitLabel,
-              ),
-              _InfoRow(label: 'Vehicle Number', value: _vehicleNumber),
-              _InfoRow(label: 'Duration', value: _duration),
+              _InfoRow(label: l10n.visitorId, value: _visitorPassCode),
+              _InfoRow(label: l10n.purposeOfVisit, value: _purpose),
+              _InfoRow(label: l10n.unit, value: VisitorAccessDummy.unitLabel),
+              _InfoRow(label: l10n.vehicleNumber, value: _vehicleNumber),
+              _InfoRow(label: l10n.duration, value: _duration),
               const Divider(height: 26),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +435,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               ),
               const SizedBox(height: 18),
               LuxuryButton(
-                label: 'Share Visitor Pass',
+                label: l10n.shareVisitorPass,
                 icon: Icons.ios_share_outlined,
                 onPressed: _nextStep,
               ),
@@ -430,12 +447,14 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   Widget _buildShareStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeading(
-            title: 'Share Visitor Pass',
+          _SectionHeading(
+            title: l10n.shareVisitorPass,
             subtitle: 'Share visitor pass with your guest.',
           ),
           const SizedBox(height: 18),
@@ -509,7 +528,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
             ),
           const SizedBox(height: 10),
           LuxuryButton(
-            label: 'Continue to Verification',
+            label: l10n.continueToVerification,
             onPressed: () => _goToStep(4),
           ),
         ],
@@ -518,6 +537,8 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   Widget _buildVerifyStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 220),
@@ -577,19 +598,22 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                     ),
                   ),
                   const SizedBox(height: 22),
-                  _InfoRow(label: 'Visitor Name', value: _visitorName),
-                  _InfoRow(label: 'Visitor ID', value: _visitorPassCode),
-                  const _InfoRow(
-                    label: 'Unit',
+                  _InfoRow(label: l10n.visitorName, value: _visitorName),
+                  _InfoRow(label: l10n.visitorId, value: _visitorPassCode),
+                  _InfoRow(
+                    label: l10n.unit,
                     value: VisitorAccessDummy.unitLabel,
                   ),
                   const _InfoRow(
                     label: 'Valid Until',
                     value: '08 Jun 2026, 16:00',
                   ),
-                  _InfoRow(label: 'Purpose', value: _purpose),
+                  _InfoRow(label: l10n.purposeOfVisit, value: _purpose),
                   const SizedBox(height: 16),
-                  LuxuryButton(label: 'Access Approved', onPressed: _nextStep),
+                  LuxuryButton(
+                    label: l10n.accessApproved,
+                    onPressed: _nextStep,
+                  ),
                 ],
               ),
       ),
@@ -597,6 +621,8 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   Widget _buildCheckInStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -611,7 +637,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 18),
           Text(
-            'Check-In Successful',
+            l10n.checkInSuccessful,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: AppColors.success,
@@ -620,7 +646,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Visitor has entered the residence.',
+            l10n.visitorEnteredResidence,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
@@ -634,27 +660,22 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
             ),
             child: Column(
               children: [
-                _InfoRow(label: 'Visitor Name', value: _visitorName),
-                const _InfoRow(
-                  label: 'Check-In Time',
-                  value: '08 Jun 2026, 14:03',
-                ),
-                const _InfoRow(
-                  label: 'Unit',
-                  value: VisitorAccessDummy.unitLabel,
-                ),
-                _InfoRow(label: 'Vehicle Number', value: _vehicleNumber),
+                _InfoRow(label: l10n.visitorName, value: _visitorName),
+                _InfoRow(label: l10n.checkInTime, value: '08 Jun 2026, 14:03'),
+                _InfoRow(label: l10n.unit, value: VisitorAccessDummy.unitLabel),
+                _InfoRow(label: l10n.vehicleNumber, value: _vehicleNumber),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          LuxuryButton(label: 'Done', onPressed: _completeCheckIn),
+          LuxuryButton(label: l10n.done, onPressed: _completeCheckIn),
         ],
       ),
     );
   }
 
   Widget _buildHistoryStep(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final items = _filteredHistory;
     return Column(
       children: [
@@ -662,9 +683,9 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _SectionHeading(
-                title: 'Visitor History',
-                subtitle: 'Track all visitor activity and check-in records.',
+              _SectionHeading(
+                title: l10n.visitorHistory,
+                subtitle: l10n.trackVisitorActivity,
               ),
               const SizedBox(height: 16),
               _ChoiceWrap<String>(
@@ -716,7 +737,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Vehicle: ${record.vehicleNumber}',
+                          '${l10n.vehicle}: ${record.vehicleNumber}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -729,18 +750,15 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
-          onPressed: () => _showSnackBar('Visitor history downloaded'),
+          onPressed: () => _showSnackBar(l10n.visitorHistoryDownloaded),
           icon: const Icon(Icons.download_rounded),
-          label: const Text('Download History'),
+          label: Text(l10n.downloadHistory),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(double.infinity, 54),
           ),
         ),
         const SizedBox(height: 12),
-        TextButton(
-          onPressed: widget.onBack,
-          child: const Text('Back to Access Hub'),
-        ),
+        TextButton(onPressed: widget.onBack, child: Text(l10n.backToAccessHub)),
       ],
     );
   }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/community_announcement_models.dart';
 import '../../../models/resident_user.dart';
 import '../../../services/api_service.dart';
@@ -85,9 +86,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
     }
   }
 
-  Future<void> _openHighlightDetail(
-    CommunityAnnouncement announcement,
-  ) async {
+  Future<void> _openHighlightDetail(CommunityAnnouncement announcement) async {
     setState(() {
       _selectedAnnouncement = announcement;
       _isLoadingDetail = true;
@@ -129,6 +128,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final residentName = _displayName(widget.resident);
     final towerValue = _rawTowerValue(widget.resident?.unit);
     final unitValue = _rawUnitValue(widget.resident?.unit);
@@ -145,31 +145,31 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
     ].join(' • ');
 
     final summaryItems = [
-      _SummaryData(label: 'Tower', value: towerLabel),
-      _SummaryData(label: 'Unit', value: unitLabel),
-      _SummaryData(label: 'Resident Type', value: residentTypeLabel),
-      _SummaryData(label: 'Contract End', value: contractLabel),
+      _SummaryData(label: l10n.tower, value: towerLabel),
+      _SummaryData(label: l10n.unit, value: unitLabel),
+      _SummaryData(label: l10n.residentType, value: residentTypeLabel),
+      _SummaryData(label: l10n.contractEnd, value: contractLabel),
     ];
 
     final quickActions = [
       _QuickAction(
         icon: Icons.groups_2_outlined,
-        label: 'Visitor',
+        label: l10n.visitor,
         onTap: () => widget.onNavigate(1),
       ),
       _QuickAction(
         icon: Icons.handyman_outlined,
-        label: 'Service\nRequest',
+        label: l10n.serviceRequest.replaceFirst(' ', '\n'),
         onTap: () => widget.onNavigate(2),
       ),
       _QuickAction(
         icon: Icons.campaign_outlined,
-        label: 'Pengumuman',
+        label: l10n.announcement,
         onTap: () => widget.onNavigate(3),
       ),
       _QuickAction(
         icon: Icons.person_outline_rounded,
-        label: 'Profil',
+        label: l10n.profile,
         onTap: () => widget.onNavigate(4),
       ),
     ];
@@ -192,7 +192,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: _DashboardSectionHeader(
-              title: 'AKSES CEPAT',
+              title: l10n.quickAccess.toUpperCase(),
             ),
           ),
 
@@ -217,7 +217,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
             child: _DashboardSectionHeader(
-              title: 'RINGKASAN HUNIAN',
+              title: l10n.residenceSummary.toUpperCase(),
             ),
           ),
 
@@ -229,8 +229,8 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
             child: _DashboardSectionHeader(
-              title: 'PENGUMUMAN TERBARU',
-              actionLabel: 'Lihat Semua',
+              title: AppLocalizations.of(context).todayHighlights.toUpperCase(),
+              actionLabel: l10n.viewAll,
               onAction: () => widget.onNavigate(3),
             ),
           ),
@@ -246,9 +246,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
     );
   }
 
-  Widget _buildHighlights({
-    required String? selectedAnnouncementId,
-  }) {
+  Widget _buildHighlights({required String? selectedAnnouncementId}) {
     if (_isLoadingHighlights) {
       return const _HighlightsLoadingCard();
     }
@@ -307,6 +305,7 @@ class _ResidenceHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final displayName = residentName.isEmpty ? 'Resident' : residentName;
     final displayLocation = locationLabel.isEmpty
         ? 'Unit belum ditentukan'
@@ -322,11 +321,7 @@ class _ResidenceHero extends StatelessWidget {
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  AppColors.navy,
-                  Color(0xFF0E3478),
-                  AppColors.blue,
-                ],
+                colors: [AppColors.navy, Color(0xFF0E3478), AppColors.blue],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -367,12 +362,12 @@ class _ResidenceHero extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          _greeting(),
-                          style:
-                              Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                          _greeting(l10n),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                         ),
                       ),
                       const _NotificationBell(),
@@ -383,11 +378,10 @@ class _ResidenceHero extends StatelessWidget {
                     displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        Theme.of(context).textTheme.displaySmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -403,11 +397,11 @@ class _ResidenceHero extends StatelessWidget {
                           displayLocation,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.92),
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.92),
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                     ],
@@ -425,9 +419,7 @@ class _ResidenceHero extends StatelessWidget {
             top: 218,
             left: 20,
             right: 20,
-            child: _BillingHeroCard(
-              onBillingTap: onBillingTap,
-            ),
+            child: _BillingHeroCard(onBillingTap: onBillingTap),
           ),
         ],
       ),
@@ -436,9 +428,7 @@ class _ResidenceHero extends StatelessWidget {
 }
 
 class _BillingHeroCard extends StatelessWidget {
-  const _BillingHeroCard({
-    required this.onBillingTap,
-  });
+  const _BillingHeroCard({required this.onBillingTap});
 
   final VoidCallback onBillingTap;
 
@@ -455,28 +445,27 @@ class _BillingHeroCard extends StatelessWidget {
                 Text(
                   'TOTAL TAGIHAN',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.2,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _currency.format(2850000),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: AppColors.navy,
-                            fontWeight: FontWeight.w900,
-                          ),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Jatuh tempo 25 Jun 2026',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -493,10 +482,7 @@ class _BillingHeroCard extends StatelessWidget {
 }
 
 class _PayNowButton extends StatelessWidget {
-  const _PayNowButton({
-    super.key,
-    required this.onTap,
-  });
+  const _PayNowButton({super.key, required this.onTap});
 
   final VoidCallback onTap;
 
@@ -526,9 +512,9 @@ class _PayNowButton extends StatelessWidget {
             child: Text(
               'BAYAR',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
@@ -550,9 +536,7 @@ class _QuickAction {
 }
 
 class _QuickAccessCard extends StatelessWidget {
-  const _QuickAccessCard({
-    required this.action,
-  });
+  const _QuickAccessCard({required this.action});
 
   final _QuickAction action;
 
@@ -564,11 +548,7 @@ class _QuickAccessCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            action.icon,
-            color: AppColors.navy,
-            size: 34,
-          ),
+          Icon(action.icon, color: AppColors.navy, size: 34),
           const SizedBox(height: 10),
           Text(
             action.label,
@@ -576,10 +556,10 @@ class _QuickAccessCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w800,
-                  height: 1.12,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w800,
+              height: 1.12,
+            ),
           ),
         ],
       ),
@@ -606,10 +586,10 @@ class _DashboardSectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.1,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.1,
+            ),
           ),
         ),
         if (actionLabel != null)
@@ -617,17 +597,14 @@ class _DashboardSectionHeader extends StatelessWidget {
             onPressed: onAction,
             style: TextButton.styleFrom(
               foregroundColor: AppColors.blue,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             ),
             child: Text(
               actionLabel!,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppColors.blue,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: AppColors.blue,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
       ],
@@ -636,9 +613,7 @@ class _DashboardSectionHeader extends StatelessWidget {
 }
 
 class _ResidenceSummaryCard extends StatelessWidget {
-  const _ResidenceSummaryCard({
-    required this.items,
-  });
+  const _ResidenceSummaryCard({required this.items});
 
   final List<_SummaryData> items;
 
@@ -657,10 +632,7 @@ class _ResidenceSummaryCard extends StatelessWidget {
               for (final item in items)
                 SizedBox(
                   width: itemWidth,
-                  child: _SummaryItem(
-                    label: item.label,
-                    value: item.value,
-                  ),
+                  child: _SummaryItem(label: item.label, value: item.value),
                 ),
             ],
           );
@@ -671,10 +643,7 @@ class _ResidenceSummaryCard extends StatelessWidget {
 }
 
 class _SummaryItem extends StatelessWidget {
-  const _SummaryItem({
-    required this.label,
-    required this.value,
-  });
+  const _SummaryItem({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -682,10 +651,7 @@ class _SummaryItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 13,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(16),
@@ -699,9 +665,9 @@ class _SummaryItem extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 7),
           Text(
@@ -709,9 +675,9 @@ class _SummaryItem extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),
@@ -752,11 +718,7 @@ class _AnnouncementDashboardCard extends StatelessWidget {
               color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(
-              icon,
-              color: accent,
-              size: 34,
-            ),
+            child: Icon(icon, color: accent, size: 34),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -768,10 +730,10 @@ class _AnnouncementDashboardCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                        height: 1.14,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                    height: 1.14,
+                  ),
                 ),
                 const SizedBox(height: 7),
                 Text(
@@ -781,9 +743,9 @@ class _AnnouncementDashboardCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.34,
-                      ),
+                    color: AppColors.textSecondary,
+                    height: 1.34,
+                  ),
                 ),
               ],
             ),
@@ -798,10 +760,7 @@ class _AnnouncementDashboardCard extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2.2),
                 )
               else
-                _AnnouncementBadge(
-                  label: badgeLabel,
-                  color: accent,
-                ),
+                _AnnouncementBadge(label: badgeLabel, color: accent),
               const SizedBox(height: 12),
               const Icon(
                 Icons.chevron_right_rounded,
@@ -816,10 +775,7 @@ class _AnnouncementDashboardCard extends StatelessWidget {
 }
 
 class _AnnouncementBadge extends StatelessWidget {
-  const _AnnouncementBadge({
-    required this.label,
-    required this.color,
-  });
+  const _AnnouncementBadge({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -828,10 +784,7 @@ class _AnnouncementBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(minWidth: 48),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(10),
@@ -842,9 +795,9 @@ class _AnnouncementBadge extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w900,
-            ),
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -855,6 +808,8 @@ class _HighlightsLoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -865,19 +820,19 @@ class _HighlightsLoadingCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Memuat pengumuman...',
+            l10n.loadingAnnouncements,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             'Sedang mengambil informasi terbaru dari management.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -886,16 +841,15 @@ class _HighlightsLoadingCard extends StatelessWidget {
 }
 
 class _HighlightsErrorCard extends StatelessWidget {
-  const _HighlightsErrorCard({
-    required this.message,
-    required this.onRetry,
-  });
+  const _HighlightsErrorCard({required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -909,13 +863,13 @@ class _HighlightsErrorCard extends StatelessWidget {
             message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 14),
           LuxuryButton(
-            label: 'Coba Lagi',
+            label: l10n.retry,
             icon: Icons.refresh_rounded,
             onPressed: onRetry,
           ),
@@ -930,6 +884,8 @@ class _HighlightsEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return WhitePremiumCard(
       child: Column(
         children: [
@@ -940,19 +896,19 @@ class _HighlightsEmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Belum ada pengumuman terbaru.',
+            l10n.noAnnouncementsAvailable,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             'Informasi dari management akan tampil pada area ini.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -981,9 +937,7 @@ class _NotificationBell extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.14),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
               child: const Icon(
                 Icons.notifications_none_rounded,
@@ -1000,19 +954,16 @@ class _NotificationBell extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF4B4B),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.navy,
-                    width: 2,
-                  ),
+                  border: Border.all(color: AppColors.navy, width: 2),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   '1',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ),
@@ -1024,63 +975,53 @@ class _NotificationBell extends StatelessWidget {
 }
 
 class _ResidentTypeBadge extends StatelessWidget {
-  const _ResidentTypeBadge({
-    required this.label,
-  });
+  const _ResidentTypeBadge({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
 }
 
 class _SummaryData {
-  const _SummaryData({
-    required this.label,
-    required this.value,
-  });
+  const _SummaryData({required this.label, required this.value});
 
   final String label;
   final String value;
 }
 
-String _greeting() {
+String _greeting(AppLocalizations l10n) {
   final hour = DateTime.now().hour;
 
   if (hour < 11) {
-    return 'Selamat pagi,';
+    return l10n.goodMorning;
   }
 
   if (hour < 15) {
-    return 'Selamat siang,';
+    return l10n.goodAfternoon;
   }
 
   if (hour < 18) {
-    return 'Selamat sore,';
+    return l10n.goodEvening;
   }
 
-  return 'Selamat malam,';
+  return l10n.goodNight;
 }
 
 String _displayName(ResidentUser? resident) {
@@ -1131,10 +1072,7 @@ String _contractLabel(ResidentUser? resident) {
   return DateFormat('d MMM yyyy', 'id_ID').format(parsedDate);
 }
 
-int _sortHighlights(
-  CommunityAnnouncement left,
-  CommunityAnnouncement right,
-) {
+int _sortHighlights(CommunityAnnouncement left, CommunityAnnouncement right) {
   if (left.isPinned != right.isPinned) {
     return left.isPinned ? -1 : 1;
   }

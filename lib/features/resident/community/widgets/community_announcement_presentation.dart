@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/luxury_button.dart';
 import '../../../../core/widgets/white_premium_card.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../models/community_announcement_models.dart';
 import '../../../../services/api_service.dart';
 
@@ -180,6 +181,7 @@ class _CommunityAnnouncementDetailSheetState
   @override
   Widget build(BuildContext context) {
     final item = _announcement;
+    final l10n = AppLocalizations.of(context);
 
     return WhitePremiumCard(
       padding: const EdgeInsets.all(20),
@@ -197,7 +199,7 @@ class _CommunityAnnouncementDetailSheetState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.title.isEmpty ? 'Management update' : item.title,
+                      item.title.isEmpty ? l10n.managementUpdate : item.title,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
@@ -208,7 +210,7 @@ class _CommunityAnnouncementDetailSheetState
                       runSpacing: 8,
                       children: [
                         _AnnouncementBadge(
-                          label: communityAnnouncementPrimaryBadgeLabel(item),
+                          label: item.isPinned ? l10n.pinned : l10n.update,
                         ),
                         _AnnouncementBadge(
                           label: communityAnnouncementCategoryLabel(
@@ -232,7 +234,7 @@ class _CommunityAnnouncementDetailSheetState
               children: [
                 Text(
                   item.content.isEmpty
-                      ? 'Please follow the latest information from management office.'
+                      ? l10n.managementFollowInfo
                       : item.content,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
@@ -241,11 +243,11 @@ class _CommunityAnnouncementDetailSheetState
                 ),
                 const SizedBox(height: 16),
                 _InfoRow(
-                  label: 'Date',
+                  label: l10n.date,
                   value: communityAnnouncementPublishedLabel(item.publishedAt),
                 ),
-                const _InfoRow(label: 'Office', value: 'Management Office'),
-                const _InfoRow(label: 'Affected area', value: 'All residents'),
+                _InfoRow(label: l10n.office, value: l10n.managementOffice),
+                _InfoRow(label: l10n.affectedArea, value: l10n.allResidents),
                 const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
@@ -258,7 +260,7 @@ class _CommunityAnnouncementDetailSheetState
                     ),
                   ),
                   child: Text(
-                    'Please follow the latest information from management office.',
+                    l10n.managementFollowInfo,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -270,7 +272,7 @@ class _CommunityAnnouncementDetailSheetState
             ),
           const SizedBox(height: 16),
           LuxuryButton(
-            label: 'Close',
+            label: l10n.close,
             icon: Icons.check_rounded,
             onPressed: () => Navigator.of(context).pop(),
           ),
@@ -298,7 +300,7 @@ class _AnnouncementDetailLoadingState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Loading latest details...',
+            AppLocalizations.of(context).loadingLatestDetails,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
