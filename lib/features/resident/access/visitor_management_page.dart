@@ -464,6 +464,66 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     }
   }
 
+  void _openVisitorPassFromHistory(VisitorAccessRecord visitor) {
+  final parsedVisitDate = DateTime.tryParse(visitor.visitDate.trim());
+
+  final fallbackPassCode = visitor.accessCardNumber.trim().isNotEmpty
+      ? visitor.accessCardNumber.trim()
+      : 'VISITOR-${visitor.id}';
+
+  setState(() {
+    // Jadikan visitor dari history sebagai visitor aktif untuk Pass step.
+    _createdVisitor = visitor;
+
+    // Reset QR pass lama supaya tidak ketukar dengan visitor sebelumnya.
+    _createdVisitorQrPass = null;
+    _qrPassErrorMessage = null;
+    _isLoadingQrPass = false;
+
+    // Step 2 = Pass step.
+    _visitorStep = 2;
+
+    // Sync data supaya _buildPassStep dan _buildShareStep pakai data visitor ini.
+    _visitorPassCode = fallbackPassCode;
+
+    if (visitor.visitorName.trim().isNotEmpty) {
+      _visitorName = visitor.visitorName.trim();
+    }
+
+    if (visitor.visitorPhone.trim().isNotEmpty) {
+      _phone = visitor.visitorPhone.trim();
+    }
+
+    if (visitor.visitPurpose.trim().isNotEmpty) {
+      _purpose = visitor.visitPurpose.trim();
+    }
+
+    if (visitor.estimatedArrivalTime.trim().isNotEmpty) {
+      _visitTime = visitor.estimatedArrivalTime.trim();
+    }
+
+    if (visitor.guestCount > 0) {
+      _visitorCount = visitor.guestCount;
+    }
+
+    if (parsedVisitDate != null) {
+      _selectedVisitDate = parsedVisitDate;
+    }
+  });
+
+  if (_canAttemptVisitorQr(visitor)) {
+    _debugVisitorQrState(
+      'Pass opened from history: visitor id=${visitor.id}, loading QR endpoint',
+    );
+
+    unawaited(_loadQrPassForCreatedVisitor());
+  } else {
+    _debugVisitorQrState(
+      'Pass opened from history: visitor id=${visitor.id}, QR unavailable/pending',
+    );
+  }
+}
+
   void _showVisitorQrSheet(VisitorAccessRecord visitor) {
     showModalBottomSheet<void>(
       context: context,
@@ -756,202 +816,230 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     );
   }
 
-  Widget _buildPassStep(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final visitor = _createdVisitor;
-    final canAttemptQr = visitor == null ? true : _canAttemptVisitorQr(visitor);
-    final qrPass = _createdVisitorQrPass;
-    final passCode = qrPass == null
-        ? (visitor?.accessCardNumber.trim().isNotEmpty == true
-              ? visitor!.accessCardNumber.trim()
-              : _visitorPassCode)
-        : _qrAccessCode(qrPass, visitor);
-    final displayName = visitor?.visitorName.trim().isNotEmpty == true
-        ? visitor!.visitorName.trim()
-        : _visitorName;
-    final displaySchedule = visitor == null
-        ? '${_selectedVisitDate == null ? '-' : _visitDateFormat.format(_selectedVisitDate!)}, ${_visitTime.isEmpty ? '-' : _visitTime}'
-        : _visitScheduleLabel(visitor);
+Widget _buildPassStep(BuildContext context) {
+  final l10n = AppLocalizations.of(context);
 
-    return Column(
-      children: [
-        if (canAttemptQr &&
-            (_isLoadingQrPass ||
-                (qrPass == null && _qrPassErrorMessage == null)))
-          const WhitePremiumCard(
-            child: _VisitorLoadingState(message: 'Loading visitor QR...'),
-          )
-        else if (canAttemptQr && _qrPassErrorMessage != null)
-          WhitePremiumCard(
-            child: _VisitorErrorState(
-              message: _qrPassErrorMessage!,
-              onRetry: visitor == null
-                  ? () {}
-                  : () => unawaited(
-                      _loadQrPassForCreatedVisitor(refreshDetailFirst: true),
-                    ),
-            ),
-          )
-        else if (canAttemptQr)
-          VisitorQrCard(
-            title: l10n.passGenerated,
-            code: passCode,
-            qrPayload: qrPass?.qrPayload,
-            visitorName: displayName,
-            schedule: displaySchedule,
-            status: qrPass?.status.trim().isNotEmpty == true
-                ? qrPass!.status
-                : visitor?.status.isNotEmpty == true
-                ? visitor!.status
-                : 'Ready to Share',
-            countdownText: qrPass?.validUntil.trim().isNotEmpty == true
-                ? 'Valid until ${_formatVisitorDate(qrPass!.validUntil)}'
-                : visitor?.expiresAt.trim().isNotEmpty == true
-                ? 'Valid until ${_formatVisitorDate(visitor!.expiresAt)}'
-                : null,
-          )
-        else
-          WhitePremiumCard(
-            child: Column(
-              children: [
-                const CircleAvatar(
-                  radius: 34,
-                  backgroundColor: AppColors.goldSoft,
-                  child: Icon(
-                    Icons.pending_actions_rounded,
-                    color: AppColors.gold,
-                    size: 34,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'QR pass menunggu approval management.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.navy,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Visitor registration berhasil dibuat dan akan aktif setelah approval.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                LuxuryButton(
-                  label: _isLoadingQrPass
-                      ? l10n.loading
-                      : 'Check Approval / Refresh QR',
-                  icon: Icons.refresh_rounded,
-                  onPressed: _isLoadingQrPass
-                      ? () {}
-                      : () => unawaited(
-                          _loadQrPassForCreatedVisitor(
-                            refreshDetailFirst: true,
-                          ),
-                        ),
-                ),
-                if (_qrPassErrorMessage != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _qrPassErrorMessage!,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        const SizedBox(height: 14),
+  final visitor = _createdVisitor;
+  final qrPass = _createdVisitorQrPass;
+
+  final hasQrPayload = qrPass?.qrPayload.trim().isNotEmpty == true;
+  final hasAccessCode = qrPass?.accessCode.trim().isNotEmpty == true;
+
+  // Ini yang jadi patokan utama tombol Share muncul.
+  // Kalau backend belum ngasih QR payload/access code, user belum boleh lanjut Share.
+  final canSharePass = qrPass != null && (hasQrPayload || hasAccessCode);
+
+  final canAttemptQr = visitor == null ? false : _canAttemptVisitorQr(visitor);
+
+  final passCode = canSharePass
+      ? _qrAccessCode(qrPass, visitor)
+      : (visitor?.accessCardNumber.trim().isNotEmpty == true
+            ? visitor!.accessCardNumber.trim()
+            : _visitorPassCode);
+
+  final displayName = visitor?.visitorName.trim().isNotEmpty == true
+      ? visitor!.visitorName.trim()
+      : _visitorName;
+
+  final displaySchedule = visitor == null
+      ? '${_selectedVisitDate == null ? '-' : _visitDateFormat.format(_selectedVisitDate!)}, ${_visitTime.isEmpty ? '-' : _visitTime}'
+      : _visitScheduleLabel(visitor);
+
+  void openHistory() {
+    setState(() {
+      _visitorStep = 6;
+      _historyFilter = 'All';
+    });
+
+    _debugVisitorQrState(
+      'History opened from pass step: loading API history',
+    );
+
+    unawaited(_loadVisitorHistory());
+  }
+
+  void openShareStep() {
+    if (!canSharePass) {
+      _showSnackBar('QR pass belum tersedia untuk dibagikan.');
+      return;
+    }
+
+    setState(() {
+      _visitorPassCode = passCode;
+      _visitorStep = 3;
+    });
+  }
+
+  return Column(
+    children: [
+      if (_isLoadingQrPass && !canSharePass)
+        const WhitePremiumCard(
+          child: _VisitorLoadingState(message: 'Loading visitor QR...'),
+        )
+      else if (canSharePass)
+        VisitorQrCard(
+          title: l10n.passGenerated,
+          code: passCode,
+          qrPayload: qrPass.qrPayload,
+          visitorName: displayName,
+          schedule: displaySchedule,
+          status: qrPass.status.trim().isNotEmpty
+              ? qrPass.status
+              : visitor?.status.trim().isNotEmpty == true
+              ? visitor!.status
+              : 'Ready to Share',
+          countdownText: qrPass.validUntil.trim().isNotEmpty
+              ? 'Valid until ${_formatVisitorDate(qrPass.validUntil)}'
+              : visitor?.expiresAt.trim().isNotEmpty == true
+              ? 'Valid until ${_formatVisitorDate(visitor!.expiresAt)}'
+              : null,
+        )
+      else
         WhitePremiumCard(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _InfoRow(label: l10n.visitorId, value: '${visitor?.id ?? '-'}'),
-              _InfoRow(
-                label: l10n.visitorName,
-                value: visitor?.visitorName.isNotEmpty == true
-                    ? visitor!.visitorName
-                    : _visitorName,
+              const CircleAvatar(
+                radius: 34,
+                backgroundColor: AppColors.goldSoft,
+                child: Icon(
+                  Icons.pending_actions_rounded,
+                  color: AppColors.gold,
+                  size: 34,
+                ),
               ),
-              _InfoRow(
-                label: l10n.mobileNumber,
-                value: visitor?.visitorPhone.isNotEmpty == true
-                    ? visitor!.visitorPhone
-                    : _phone,
-              ),
-              _InfoRow(
-                label: l10n.purposeOfVisit,
-                value: visitor?.visitPurpose.isNotEmpty == true
-                    ? visitor!.visitPurpose
-                    : _purpose,
-              ),
-              _InfoRow(label: l10n.visitTime, value: displaySchedule),
-              _InfoRow(
-                label: l10n.numberOfVisitors,
-                value: '${visitor?.guestCount ?? _visitorCount}',
-              ),
-              _InfoRow(
-                label: l10n.unit,
-                value: visitor?.unit.displayLabel ?? '-',
-              ),
-              _InfoRow(
-                label: 'Access Card',
-                value: visitor?.accessCardNumber.trim().isNotEmpty == true
-                    ? visitor!.accessCardNumber
-                    : '-',
-              ),
-              _InfoRow(
-                label: l10n.status,
-                value: visitor?.status.trim().isNotEmpty == true
-                    ? visitor!.status
-                    : '-',
-              ),
-              const Divider(height: 26),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.verified_user_outlined,
-                    size: 18,
-                    color: AppColors.gold,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'This pass is valid only for the above time and unit.',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(height: 1.4),
+              const SizedBox(height: 14),
+              Text(
+                canAttemptQr
+                    ? 'QR pass belum tersedia.'
+                    : 'QR pass menunggu approval management.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w900,
                     ),
-                  ),
-                ],
               ),
-              const SizedBox(height: 18),
-              LuxuryButton(
-                label: l10n.viewHistory,
-                icon: Icons.history_outlined,
-                onPressed: () {
-                  setState(() {
-                    _visitorStep = 6;
-                    _historyFilter = 'All';
-                  });
-                  _debugVisitorQrState(
-                    'History opened from pass step: loading API history',
-                  );
-                  unawaited(_loadVisitorHistory());
-                },
+              const SizedBox(height: 6),
+              Text(
+                canAttemptQr
+                    ? 'Visitor sudah diproses, tetapi QR belum tersedia dari admin.'
+                    : 'Visitor registration berhasil dibuat dan akan aktif setelah approval.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
               ),
+              if (_qrPassErrorMessage != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _qrPassErrorMessage!,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                ),
+              ],
             ],
           ),
         ),
-      ],
-    );
-  }
+
+      const SizedBox(height: 14),
+
+      WhitePremiumCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _InfoRow(label: l10n.visitorId, value: '${visitor?.id ?? '-'}'),
+            _InfoRow(
+              label: l10n.visitorName,
+              value: visitor?.visitorName.isNotEmpty == true
+                  ? visitor!.visitorName
+                  : _visitorName,
+            ),
+            _InfoRow(
+              label: l10n.mobileNumber,
+              value: visitor?.visitorPhone.isNotEmpty == true
+                  ? visitor!.visitorPhone
+                  : _phone,
+            ),
+            _InfoRow(
+              label: l10n.purposeOfVisit,
+              value: visitor?.visitPurpose.isNotEmpty == true
+                  ? visitor!.visitPurpose
+                  : _purpose,
+            ),
+            _InfoRow(label: l10n.visitTime, value: displaySchedule),
+            _InfoRow(
+              label: l10n.numberOfVisitors,
+              value: '${visitor?.guestCount ?? _visitorCount}',
+            ),
+            _InfoRow(
+              label: l10n.unit,
+              value: visitor?.unit.displayLabel ?? '-',
+            ),
+            _InfoRow(
+              label: 'Access Card',
+              value: visitor?.accessCardNumber.trim().isNotEmpty == true
+                  ? visitor!.accessCardNumber
+                  : '-',
+            ),
+            _InfoRow(
+              label: l10n.status,
+              value: visitor?.status.trim().isNotEmpty == true
+                  ? visitor!.status
+                  : '-',
+            ),
+            const Divider(height: 26),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.verified_user_outlined,
+                  size: 18,
+                  color: AppColors.gold,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    canSharePass
+                        ? 'This pass is valid only for the above time and unit.'
+                        : 'QR pass belum bisa dibagikan sebelum tersedia dari management.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          height: 1.4,
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            if (canSharePass) ...[
+              LuxuryButton(
+                label: l10n.shareVisitorPass,
+                icon: Icons.ios_share_rounded,
+                onPressed: openShareStep,
+              ),
+              const SizedBox(height: 12),
+              LuxuryButton(
+                label: l10n.viewHistory,
+                icon: Icons.history_outlined,
+                onPressed: openHistory,
+              ),
+            ] else
+              LuxuryButton(
+                label: l10n.viewHistory,
+                icon: Icons.history_outlined,
+                onPressed: openHistory,
+              ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildShareStep(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1436,12 +1524,12 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                         ),
                     const SizedBox(height: 16),
                     if (_canAttemptVisitorQr(visitor)) ...[
-                      LuxuryButton(
+                     LuxuryButton(
                         label: 'View QR Pass',
                         icon: Icons.qr_code_2_rounded,
                         onPressed: () {
                           Navigator.of(context).pop();
-                          _showVisitorQrSheet(visitor);
+                          _openVisitorPassFromHistory(visitor);
                         },
                       ),
                       const SizedBox(height: 10),
