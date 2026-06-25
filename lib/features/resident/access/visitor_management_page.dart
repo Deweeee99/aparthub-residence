@@ -8,6 +8,9 @@ import '../../../core/widgets/luxury_button.dart';
 import '../../../core/widgets/white_premium_card.dart';
 import '../../../data/data_dummy/visitor_access_dummy.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../models/visitor_access_models.dart';
+import '../../../services/api_service.dart';
+import '../../../services/app_debug_logger.dart';
 import 'widgets/visitor_qr_card.dart';
 import 'widgets/visitor_status_badge.dart';
 import 'widgets/visitor_step_indicator.dart';
@@ -19,10 +22,12 @@ class VisitorManagementPage extends StatefulWidget {
     super.key,
     required this.onBack,
     required this.initialMode,
+    this.apiService,
   });
 
   final VoidCallback onBack;
   final VisitorManagementInitialMode initialMode;
+  final ApiService? apiService;
 
   @override
   State<VisitorManagementPage> createState() => _VisitorManagementPageState();
@@ -38,25 +43,48 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     'Check-In',
     'History',
   ];
+  static const _historyFilters = [
+    'All',
+    'Pending',
+    'Approved',
+    'Rejected',
+    'Checked In',
+    'Checked Out',
+    'Cancelled',
+    'Expired',
+  ];
 
+  late final ApiService _apiService = widget.apiService ?? ApiService();
   final _dateTimeFormat = DateFormat('dd MMM yyyy, HH:mm', 'id_ID');
+  final _visitDateFormat = DateFormat('yyyy-MM-dd');
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _vehicleController;
-  late final List<VisitorAccessRecord> _visitorHistory;
+  // Hold: vehicle number is hidden until backend supports it in visitor POST.
+  // late final TextEditingController _vehicleController;
+  List<VisitorAccessRecord> _visitorHistory = const [];
+  VisitorAccessRecord? _createdVisitor;
 
   late int _visitorStep;
-  var _visitorName = VisitorAccessDummy.defaultVisitorName;
-  var _phone = VisitorAccessDummy.defaultPhone;
-  var _purpose = VisitorAccessDummy.defaultPurpose;
-  var _visitTime = VisitorAccessDummy.defaultVisitTime;
-  var _duration = VisitorAccessDummy.defaultDuration;
+  var _visitorName = '';
+  var _phone = '';
+  var _purpose = '';
+  DateTime? _selectedVisitDate;
+  var _visitTime = '';
+  // Hold: duration is hidden until backend supports it in visitor POST.
+  // var _duration = VisitorAccessDummy.defaultDuration;
   var _visitorCount = 1;
-  var _vehicleNumber = VisitorAccessDummy.defaultVehicleNumber;
+  // Hold: vehicle number is hidden until backend supports it in visitor POST.
+  // var _vehicleNumber = VisitorAccessDummy.defaultVehicleNumber;
   var _visitorPassCode = VisitorAccessDummy.defaultPassCode;
   var _historyFilter = 'All';
   var _isVerifying = false;
-  var _hasSavedCheckIn = false;
+  var _isLoadingHistory = false;
+  var _isLoadingDetail = false;
+  var _isLoadingQrPass = false;
+  var _isSubmittingVisitor = false;
+  String? _historyErrorMessage;
+  String? _qrPassErrorMessage;
+  VisitorQrPass? _createdVisitorQrPass;
 
   @override
   void initState() {
@@ -64,31 +92,22 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     _visitorStep = widget.initialMode == VisitorManagementInitialMode.history
         ? _steps.length - 1
         : 0;
-    _nameController = TextEditingController(text: _visitorName);
-    _phoneController = TextEditingController(text: _phone);
-    _vehicleController = TextEditingController(text: _vehicleNumber);
-    _visitorHistory = List.of(VisitorAccessDummy.seedHistory);
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
+    // Hold: _vehicleController kept out of active flow until backend supports it.
+    // _vehicleController = TextEditingController(text: _vehicleNumber);
+    if (widget.initialMode == VisitorManagementInitialMode.history) {
+      unawaited(_loadVisitorHistory());
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _vehicleController.dispose();
+    // Hold: _vehicleController kept out of active flow until backend supports it.
+    // _vehicleController.dispose();
     super.dispose();
-  }
-
-  List<VisitorAccessRecord> get _filteredHistory {
-    final now = DateTime(2026, 6, 8, 12);
-    return _visitorHistory.where((record) {
-      return switch (_historyFilter) {
-        'Upcoming' => record.dateTime.isAfter(now),
-        'Past' => record.dateTime.isBefore(now),
-        'Checked In' => record.status == 'Checked In',
-        'Checked Out' => record.status == 'Checked Out',
-        _ => true,
-      };
-    }).toList();
   }
 
   void _goToStep(int step) {
@@ -96,6 +115,9 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     setState(() => _visitorStep = target);
     if (target == 4) {
       _startVerification();
+    }
+    if (target == 6 && _visitorHistory.isEmpty && !_isLoadingHistory) {
+      unawaited(_loadVisitorHistory());
     }
   }
 
@@ -107,27 +129,110 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _debugVisitorQrState(String message) {
+    appDebugLog('VisitorManagement', message);
+  }
+
+  bool _canAttemptVisitorQr(VisitorAccessRecord visitor) {
+    return visitor.qrAvailable ||
+        visitor.status.trim().toLowerCase() == 'approved';
+  }
+
   void _saveRegistration() {
+    final visitorName = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+
+    if (visitorName.isEmpty) {
+      _showSnackBar('Nama visitor wajib diisi.');
+      return;
+    }
+    if (phone.isEmpty) {
+      _showSnackBar('Nomor ponsel visitor wajib diisi.');
+      return;
+    }
+    if (_purpose.trim().isEmpty) {
+      _showSnackBar('Tujuan kunjungan wajib dipilih.');
+      return;
+    }
+
     setState(() {
-      _visitorName = _nameController.text.trim().isEmpty
-          ? VisitorAccessDummy.defaultVisitorName
-          : _nameController.text.trim();
-      _phone = _phoneController.text.trim().isEmpty
-          ? VisitorAccessDummy.defaultPhone
-          : _phoneController.text.trim();
-      _vehicleNumber = _vehicleController.text.trim().isEmpty
-          ? '-'
-          : _vehicleController.text.trim();
+      _visitorName = visitorName;
+      _phone = phone;
+      // Hold: vehicle number is intentionally not collected/sent in this phase.
+      // _vehicleNumber = _vehicleController.text.trim().isEmpty
+      //     ? '-'
+      //     : _vehicleController.text.trim();
     });
     _nextStep();
   }
 
-  void _generatePassCode() {
-    final nextNumber = (_visitorHistory.length + 126).toString().padLeft(
-      5,
-      '0',
-    );
-    setState(() => _visitorPassCode = 'VST-2026-$nextNumber');
+  // Hold: local pass-code generation is inactive while create uses backend response.
+  // void _generatePassCode() {
+  //   final nextNumber = (_localVisitorHistory.length + 126).toString().padLeft(
+  //     5,
+  //     '0',
+  //   );
+  //   setState(() => _visitorPassCode = 'VST-2026-$nextNumber');
+  // }
+
+  Future<void> _submitVisitorRegistration() async {
+    if (_isSubmittingVisitor) {
+      return;
+    }
+    final selectedVisitDate = _selectedVisitDate;
+    if (selectedVisitDate == null) {
+      _showSnackBar('Tanggal kunjungan wajib dipilih.');
+      return;
+    }
+    if (_visitTime.trim().isEmpty) {
+      _showSnackBar('Waktu kedatangan wajib dipilih.');
+      return;
+    }
+
+    setState(() => _isSubmittingVisitor = true);
+    try {
+      final visitor = await _apiService.createResidentVisitor(
+        visitorName: _visitorName,
+        visitorPhone: _phone,
+        visitDate: _visitDateFormat.format(selectedVisitDate),
+        estimatedArrivalTime: _visitTime,
+        guestCount: _visitorCount,
+        visitPurpose: _purpose,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _createdVisitor = visitor;
+        _createdVisitorQrPass = null;
+        _qrPassErrorMessage = null;
+        _visitorPassCode = visitor.accessCardNumber.trim().isNotEmpty
+            ? visitor.accessCardNumber.trim()
+            : 'VISITOR-${visitor.id}';
+        _isSubmittingVisitor = false;
+        _visitorStep = 2;
+      });
+      _debugVisitorQrState(
+        'Create visitor result: id=${visitor.id}, status="${visitor.status}", qrAvailable=${visitor.qrAvailable}',
+      );
+      if (_canAttemptVisitorQr(visitor)) {
+        unawaited(_loadQrPassForCreatedVisitor());
+      } else {
+        _debugVisitorQrState(
+          'Pass step QR decision: pending approval for visitor ${visitor.id}',
+        );
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isSubmittingVisitor = false);
+      _showSnackBar(
+        error is ApiServiceException
+            ? error.message
+            : 'Registrasi visitor belum bisa dibuat. Coba lagi.',
+      );
+    }
   }
 
   void _startVerification() {
@@ -143,31 +248,289 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   void _completeCheckIn() {
-    if (!_hasSavedCheckIn) {
-      final parts = _visitTime.split(':');
-      final visitDateTime = DateTime(
-        2026,
-        6,
-        8,
-        int.parse(parts.first),
-        int.parse(parts.last),
+    _nextStep();
+  }
+
+  Future<void> _pickVisitDate() async {
+    final now = DateTime.now();
+    final firstDate = DateTime(now.year, now.month, now.day);
+    final initialDate =
+        _selectedVisitDate == null || _selectedVisitDate!.isBefore(firstDate)
+        ? firstDate
+        : _selectedVisitDate!;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: DateTime(firstDate.year + 1, firstDate.month, firstDate.day),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.navy,
+              secondary: AppColors.gold,
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+
+    if (picked == null || !mounted) {
+      return;
+    }
+    setState(() => _selectedVisitDate = picked);
+  }
+
+  Future<void> _loadVisitorHistory({String? status}) async {
+    setState(() {
+      _isLoadingHistory = true;
+      _historyErrorMessage = null;
+      if (status != null) {
+        _historyFilter = status;
+      }
+    });
+    _debugVisitorQrState(
+      'History load start: filter="${_historyFilter == 'All' ? 'All/no-query' : _historyFilter}"',
+    );
+
+    try {
+      final visitors = await _apiService.getResidentVisitors(
+        status: _historyFilter == 'All' ? null : _historyFilter,
       );
+      if (!mounted) {
+        return;
+      }
       setState(() {
-        _visitorHistory.insert(
-          0,
-          VisitorAccessRecord(
-            visitorName: _visitorName,
-            purpose: _purpose,
-            dateTime: visitDateTime.add(const Duration(minutes: 3)),
-            passCode: _visitorPassCode,
-            status: 'Checked In',
-            vehicleNumber: _vehicleNumber,
+        _visitorHistory = visitors;
+        _isLoadingHistory = false;
+      });
+      _debugVisitorQrState(
+        'History load success: count=${visitors.length}, filter="$_historyFilter"',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingHistory = false;
+        _historyErrorMessage = error is ApiServiceException
+            ? error.message
+            : 'Data visitor belum bisa dimuat. Coba lagi.';
+      });
+      _debugVisitorQrState('History load failed: $error');
+    }
+  }
+
+  Future<void> _openVisitorDetail(VisitorAccessRecord visitor) async {
+    if (_isLoadingDetail) {
+      return;
+    }
+
+    setState(() => _isLoadingDetail = true);
+    try {
+      final detail = await _apiService.getResidentVisitorDetail(visitor.id);
+      if (!mounted) {
+        return;
+      }
+      _showVisitorDetailSheet(detail);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        error is ApiServiceException
+            ? error.message
+            : 'Detail visitor belum bisa dimuat. Coba lagi.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingDetail = false);
+      }
+    }
+  }
+
+  Future<void> _loadQrPassForCreatedVisitor({
+    bool refreshDetailFirst = false,
+  }) async {
+    final visitor = _createdVisitor;
+    if (visitor == null) {
+      _debugVisitorQrState('QR load skipped: no created visitor state');
+      return;
+    }
+
+    if (refreshDetailFirst) {
+      await _refreshCreatedVisitorApproval();
+      if (!mounted) {
+        return;
+      }
+      final refreshedVisitor = _createdVisitor;
+      if (refreshedVisitor == null || !_canAttemptVisitorQr(refreshedVisitor)) {
+        _debugVisitorQrState(
+          'QR load skipped: visitor ${refreshedVisitor?.id ?? visitor.id} is still pending/unavailable',
+        );
+        return;
+      }
+      if (!refreshedVisitor.qrAvailable &&
+          refreshedVisitor.status.trim().toLowerCase() == 'approved') {
+        _debugVisitorQrState(
+          'Detail says Approved but qrAvailable=false; attempting QR endpoint anyway',
+        );
+      }
+    }
+
+    final currentVisitor = _createdVisitor;
+    if (currentVisitor == null) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingQrPass = true;
+      _qrPassErrorMessage = null;
+    });
+    _debugVisitorQrState('QR endpoint start: visitor id=${currentVisitor.id}');
+
+    try {
+      final qrPass = await _apiService.getResidentVisitorQr(currentVisitor.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _createdVisitorQrPass = qrPass;
+        _visitorPassCode = qrPass.accessCode.trim().isNotEmpty
+            ? qrPass.accessCode.trim()
+            : _visitorPassCode;
+        _isLoadingQrPass = false;
+      });
+      _debugVisitorQrState(
+        'QR endpoint success: visitor id=${qrPass.visitorId}, status="${qrPass.status}", hasPayload=${qrPass.qrPayload.trim().isNotEmpty}, hasAccessCode=${qrPass.accessCode.trim().isNotEmpty}, validUntil="${qrPass.validUntil}"',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingQrPass = false;
+        _qrPassErrorMessage = error is ApiServiceException
+            ? error.message
+            : 'QR visitor belum bisa dimuat. Coba lagi.';
+      });
+      _debugVisitorQrState(
+        'QR endpoint failed: visitor id=${currentVisitor.id}, error=$error',
+      );
+    }
+  }
+
+  Future<void> _refreshCreatedVisitorApproval() async {
+    final visitor = _createdVisitor;
+    if (visitor == null || _isLoadingQrPass) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingQrPass = true;
+      _qrPassErrorMessage = null;
+    });
+    _debugVisitorQrState('Refresh approval start: visitor id=${visitor.id}');
+
+    try {
+      final refreshed = await _apiService.getResidentVisitorDetail(visitor.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _createdVisitor = refreshed;
+        _isLoadingQrPass = false;
+        _visitorPassCode = refreshed.accessCardNumber.trim().isNotEmpty
+            ? refreshed.accessCardNumber.trim()
+            : _visitorPassCode;
+      });
+      _debugVisitorQrState(
+        'Refresh approval success: visitor id=${refreshed.id}, status="${refreshed.status}", qrAvailable=${refreshed.qrAvailable}, accessCard="${refreshed.accessCardNumber}", expiresAt="${refreshed.expiresAt}"',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingQrPass = false;
+        _qrPassErrorMessage = error is ApiServiceException
+            ? error.message
+            : 'Detail visitor belum bisa dimuat. Coba lagi.';
+      });
+      _debugVisitorQrState(
+        'Refresh approval failed: visitor id=${visitor.id}, error=$error',
+      );
+    }
+  }
+
+  void _showVisitorQrSheet(VisitorAccessRecord visitor) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final qrFuture = _apiService.getResidentVisitorQr(visitor.id);
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: FutureBuilder<VisitorQrPass>(
+              future: qrFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const WhitePremiumCard(
+                    child: _VisitorLoadingState(
+                      message: 'Loading visitor QR...',
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return WhitePremiumCard(
+                    child: _VisitorErrorState(
+                      message: 'QR visitor belum bisa dimuat. Coba lagi.',
+                      onRetry: () {
+                        Navigator.of(context).pop();
+                        _showVisitorQrSheet(visitor);
+                      },
+                    ),
+                  );
+                }
+
+                final qrPass = snapshot.data!;
+                return SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      VisitorQrCard(
+                        title: 'Visitor QR Pass',
+                        code: _qrAccessCode(qrPass, visitor),
+                        qrPayload: qrPass.qrPayload,
+                        visitorName: visitor.visitorName,
+                        schedule: _visitScheduleLabel(visitor),
+                        status: qrPass.status.trim().isNotEmpty
+                            ? qrPass.status
+                            : visitor.status,
+                        countdownText: qrPass.validUntil.trim().isNotEmpty
+                            ? 'Valid until ${_formatVisitorDate(qrPass.validUntil)}'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      LuxuryButton(
+                        label: AppLocalizations.of(context).close,
+                        icon: Icons.check_rounded,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         );
-        _hasSavedCheckIn = true;
-      });
-    }
-    _nextStep();
+      },
+    );
   }
 
   @override
@@ -276,8 +639,9 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
           _LabeledField(
             label: l10n.mobileNumber,
             child: _PremiumTextField(
+              key: const ValueKey('visitor-phone-field'),
               controller: _phoneController,
-              hintText: '+62 812-3456-7890',
+              hintText: '+62 8xx-xxxx-xxxx',
               icon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
             ),
@@ -330,15 +694,16 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
-          _LabeledField(
-            label: l10n.vehicleNumberOptional,
-            child: _PremiumTextField(
-              controller: _vehicleController,
-              hintText: 'B 1234 ABC',
-              icon: Icons.directions_car_outlined,
-            ),
-          ),
+          // Hold: vehicle number is hidden until backend supports it in POST /resident/visitors.
+          // const SizedBox(height: 14),
+          // _LabeledField(
+          //   label: l10n.vehicleNumberOptional,
+          //   child: _PremiumTextField(
+          //     controller: _vehicleController,
+          //     hintText: 'B 1234 ABC',
+          //     icon: Icons.directions_car_outlined,
+          //   ),
+          // ),
           const SizedBox(height: 22),
           LuxuryButton(label: l10n.next, onPressed: _saveRegistration),
         ],
@@ -355,10 +720,13 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
         children: [
           _SectionHeading(
             title: l10n.scheduleVisit,
-            subtitle: 'Choose visit date, time, and expected duration.',
+            subtitle: 'Choose visit date and estimated arrival time.',
           ),
           const SizedBox(height: 18),
-          const _CalendarCard(selectedDay: 8),
+          _DatePickerCard(
+            selectedDate: _selectedVisitDate,
+            onTap: _pickVisitDate,
+          ),
           const SizedBox(height: 18),
           _LabeledField(
             label: l10n.visitTime,
@@ -368,22 +736,20 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               onSelected: (value) => setState(() => _visitTime = value),
             ),
           ),
-          const SizedBox(height: 14),
-          _LabeledField(
-            label: l10n.expectedDuration,
-            child: _ChoiceWrap<String>(
-              options: VisitorAccessDummy.durationOptions,
-              selected: _duration,
-              onSelected: (value) => setState(() => _duration = value),
-            ),
-          ),
+          // Hold: duration is hidden until backend supports it in POST /resident/visitors.
+          // const SizedBox(height: 14),
+          // _LabeledField(
+          //   label: l10n.expectedDuration,
+          //   child: _ChoiceWrap<String>(
+          //     options: VisitorAccessDummy.durationOptions,
+          //     selected: _duration,
+          //     onSelected: (value) => setState(() => _duration = value),
+          //   ),
+          // ),
           const SizedBox(height: 20),
           LuxuryButton(
-            label: l10n.confirm,
-            onPressed: () {
-              _generatePassCode();
-              _nextStep();
-            },
+            label: _isSubmittingVisitor ? l10n.submitting : l10n.confirm,
+            onPressed: _submitVisitorRegistration,
           ),
         ],
       ),
@@ -392,27 +758,159 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
 
   Widget _buildPassStep(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final visitor = _createdVisitor;
+    final canAttemptQr = visitor == null ? true : _canAttemptVisitorQr(visitor);
+    final qrPass = _createdVisitorQrPass;
+    final passCode = qrPass == null
+        ? (visitor?.accessCardNumber.trim().isNotEmpty == true
+              ? visitor!.accessCardNumber.trim()
+              : _visitorPassCode)
+        : _qrAccessCode(qrPass, visitor);
+    final displayName = visitor?.visitorName.trim().isNotEmpty == true
+        ? visitor!.visitorName.trim()
+        : _visitorName;
+    final displaySchedule = visitor == null
+        ? '${_selectedVisitDate == null ? '-' : _visitDateFormat.format(_selectedVisitDate!)}, ${_visitTime.isEmpty ? '-' : _visitTime}'
+        : _visitScheduleLabel(visitor);
 
     return Column(
       children: [
-        VisitorQrCard(
-          title: l10n.passGenerated,
-          code: _visitorPassCode,
-          visitorName: _visitorName,
-          schedule: '${VisitorAccessDummy.visitDateLabel}, $_visitTime',
-          status: 'Ready to Share',
-          countdownText: 'Valid until 16:00',
-        ),
+        if (canAttemptQr &&
+            (_isLoadingQrPass ||
+                (qrPass == null && _qrPassErrorMessage == null)))
+          const WhitePremiumCard(
+            child: _VisitorLoadingState(message: 'Loading visitor QR...'),
+          )
+        else if (canAttemptQr && _qrPassErrorMessage != null)
+          WhitePremiumCard(
+            child: _VisitorErrorState(
+              message: _qrPassErrorMessage!,
+              onRetry: visitor == null
+                  ? () {}
+                  : () => unawaited(
+                      _loadQrPassForCreatedVisitor(refreshDetailFirst: true),
+                    ),
+            ),
+          )
+        else if (canAttemptQr)
+          VisitorQrCard(
+            title: l10n.passGenerated,
+            code: passCode,
+            qrPayload: qrPass?.qrPayload,
+            visitorName: displayName,
+            schedule: displaySchedule,
+            status: qrPass?.status.trim().isNotEmpty == true
+                ? qrPass!.status
+                : visitor?.status.isNotEmpty == true
+                ? visitor!.status
+                : 'Ready to Share',
+            countdownText: qrPass?.validUntil.trim().isNotEmpty == true
+                ? 'Valid until ${_formatVisitorDate(qrPass!.validUntil)}'
+                : visitor?.expiresAt.trim().isNotEmpty == true
+                ? 'Valid until ${_formatVisitorDate(visitor!.expiresAt)}'
+                : null,
+          )
+        else
+          WhitePremiumCard(
+            child: Column(
+              children: [
+                const CircleAvatar(
+                  radius: 34,
+                  backgroundColor: AppColors.goldSoft,
+                  child: Icon(
+                    Icons.pending_actions_rounded,
+                    color: AppColors.gold,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'QR pass menunggu approval management.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Visitor registration berhasil dibuat dan akan aktif setelah approval.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                LuxuryButton(
+                  label: _isLoadingQrPass
+                      ? l10n.loading
+                      : 'Check Approval / Refresh QR',
+                  icon: Icons.refresh_rounded,
+                  onPressed: _isLoadingQrPass
+                      ? () {}
+                      : () => unawaited(
+                          _loadQrPassForCreatedVisitor(
+                            refreshDetailFirst: true,
+                          ),
+                        ),
+                ),
+                if (_qrPassErrorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _qrPassErrorMessage!,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         const SizedBox(height: 14),
         WhitePremiumCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _InfoRow(label: l10n.visitorId, value: _visitorPassCode),
-              _InfoRow(label: l10n.purposeOfVisit, value: _purpose),
-              _InfoRow(label: l10n.unit, value: VisitorAccessDummy.unitLabel),
-              _InfoRow(label: l10n.vehicleNumber, value: _vehicleNumber),
-              _InfoRow(label: l10n.duration, value: _duration),
+              _InfoRow(label: l10n.visitorId, value: '${visitor?.id ?? '-'}'),
+              _InfoRow(
+                label: l10n.visitorName,
+                value: visitor?.visitorName.isNotEmpty == true
+                    ? visitor!.visitorName
+                    : _visitorName,
+              ),
+              _InfoRow(
+                label: l10n.mobileNumber,
+                value: visitor?.visitorPhone.isNotEmpty == true
+                    ? visitor!.visitorPhone
+                    : _phone,
+              ),
+              _InfoRow(
+                label: l10n.purposeOfVisit,
+                value: visitor?.visitPurpose.isNotEmpty == true
+                    ? visitor!.visitPurpose
+                    : _purpose,
+              ),
+              _InfoRow(label: l10n.visitTime, value: displaySchedule),
+              _InfoRow(
+                label: l10n.numberOfVisitors,
+                value: '${visitor?.guestCount ?? _visitorCount}',
+              ),
+              _InfoRow(
+                label: l10n.unit,
+                value: visitor?.unit.displayLabel ?? '-',
+              ),
+              _InfoRow(
+                label: 'Access Card',
+                value: visitor?.accessCardNumber.trim().isNotEmpty == true
+                    ? visitor!.accessCardNumber
+                    : '-',
+              ),
+              _InfoRow(
+                label: l10n.status,
+                value: visitor?.status.trim().isNotEmpty == true
+                    ? visitor!.status
+                    : '-',
+              ),
               const Divider(height: 26),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,9 +933,18 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               ),
               const SizedBox(height: 18),
               LuxuryButton(
-                label: l10n.shareVisitorPass,
-                icon: Icons.ios_share_outlined,
-                onPressed: _nextStep,
+                label: l10n.viewHistory,
+                icon: Icons.history_outlined,
+                onPressed: () {
+                  setState(() {
+                    _visitorStep = 6;
+                    _historyFilter = 'All';
+                  });
+                  _debugVisitorQrState(
+                    'History opened from pass step: loading API history',
+                  );
+                  unawaited(_loadVisitorHistory());
+                },
               ),
             ],
           ),
@@ -663,7 +1170,8 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
                 _InfoRow(label: l10n.visitorName, value: _visitorName),
                 _InfoRow(label: l10n.checkInTime, value: '08 Jun 2026, 14:03'),
                 _InfoRow(label: l10n.unit, value: VisitorAccessDummy.unitLabel),
-                _InfoRow(label: l10n.vehicleNumber, value: _vehicleNumber),
+                // Hold: vehicle number hidden until backend supports it.
+                // _InfoRow(label: l10n.vehicleNumber, value: _vehicleNumber),
               ],
             ),
           ),
@@ -676,7 +1184,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
 
   Widget _buildHistoryStep(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final items = _filteredHistory;
+
     return Column(
       children: [
         WhitePremiumCard(
@@ -689,65 +1197,91 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
               ),
               const SizedBox(height: 16),
               _ChoiceWrap<String>(
-                options: VisitorAccessDummy.historyFilters,
+                options: _historyFilters,
                 selected: _historyFilter,
-                onSelected: (value) => setState(() => _historyFilter = value),
+                onSelected: (value) => _loadVisitorHistory(status: value),
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        for (final record in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: WhitePremiumCard(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.gold.withValues(alpha: 0.14),
-                    child: Text(
-                      _initials(record.visitorName),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          record.visitorName,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(
-                                color: AppColors.navy,
-                                fontWeight: FontWeight.w900,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(record.purpose),
-                        const SizedBox(height: 8),
-                        Text(
-                          _dateTimeFormat.format(record.dateTime),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${l10n.vehicle}: ${record.vehicleNumber}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  VisitorStatusBadge(status: record.status),
-                ],
-              ),
+        if (_isLoadingHistory)
+          const WhitePremiumCard(
+            child: _VisitorLoadingState(message: 'Memuat riwayat visitor...'),
+          ),
+        if (!_isLoadingHistory && _historyErrorMessage != null)
+          WhitePremiumCard(
+            child: _VisitorErrorState(
+              message: _historyErrorMessage!,
+              onRetry: _loadVisitorHistory,
             ),
           ),
+        if (!_isLoadingHistory &&
+            _historyErrorMessage == null &&
+            _visitorHistory.isEmpty)
+          const WhitePremiumCard(
+            child: _VisitorEmptyState(message: 'Belum ada data visitor.'),
+          ),
+        if (!_isLoadingHistory && _historyErrorMessage == null)
+          for (final record in _visitorHistory)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: WhitePremiumCard(
+                onTap: () => _openVisitorDetail(record),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.gold.withValues(alpha: 0.14),
+                      child: Text(
+                        _initials(record.visitorName),
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            record.visitorName.isEmpty
+                                ? '-'
+                                : record.visitorName,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: AppColors.navy,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(_visitorPurposeLabel(record)),
+                          const SizedBox(height: 8),
+                          Text(
+                            _visitScheduleLabel(record),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${l10n.unit}: ${record.unit.displayLabel}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    VisitorStatusBadge(status: record.status),
+                  ],
+                ),
+              ),
+            ),
+        if (_isLoadingDetail) ...[
+          const SizedBox(height: 4),
+          const LinearProgressIndicator(minHeight: 3),
+        ],
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: () => _showSnackBar(l10n.visitorHistoryDownloaded),
@@ -761,6 +1295,238 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
         TextButton(onPressed: widget.onBack, child: Text(l10n.backToAccessHub)),
       ],
     );
+  }
+
+  void _showVisitorDetailSheet(VisitorAccessRecord visitor) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: WhitePremiumCard(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: AppColors.gold.withValues(
+                            alpha: 0.14,
+                          ),
+                          child: Text(
+                            _initials(visitor.visitorName),
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: AppColors.navy,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                visitor.visitorName.isEmpty
+                                    ? '-'
+                                    : visitor.visitorName,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  VisitorStatusBadge(status: visitor.status),
+                                  _StaticPill(
+                                    label: visitor.qrAvailable
+                                        ? l10n.visitorQrPass
+                                        : 'QR unavailable',
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (visitor.identityPhotoUrl.trim().isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Image.network(
+                            visitor.identityPhotoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              color: AppColors.surfaceMuted,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: AppColors.gold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    _DetailPanel(
+                      rows: [
+                        (l10n.mobileNumber, visitor.visitorPhone),
+                        (l10n.purposeOfVisit, _visitorPurposeLabel(visitor)),
+                        (l10n.visitTime, _visitScheduleLabel(visitor)),
+                        (l10n.numberOfVisitors, '${visitor.guestCount}'),
+                        (l10n.unit, visitor.unit.displayLabel),
+                        ('Source', _dashIfEmpty(visitor.registrationSource)),
+                        ('Access Card', _dashIfEmpty(visitor.accessCardNumber)),
+                        ('Expires At', _formatVisitorDate(visitor.expiresAt)),
+                        ('Approved At', _formatVisitorDate(visitor.approvedAt)),
+                        ('Rejected At', _formatVisitorDate(visitor.rejectedAt)),
+                        (
+                          'Cancelled At',
+                          _formatVisitorDate(visitor.cancelledAt),
+                        ),
+                        (
+                          l10n.checkInTime,
+                          _formatVisitorDate(visitor.checkedInAt),
+                        ),
+                        (
+                          'Checked Out',
+                          _formatVisitorDate(visitor.checkedOutAt),
+                        ),
+                        if (visitor.cancellationReason.trim().isNotEmpty)
+                          ('Cancellation Reason', visitor.cancellationReason),
+                        if (visitor.rejectionReason.trim().isNotEmpty)
+                          ('Rejection Reason', visitor.rejectionReason),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.timeline,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (visitor.timeline.isEmpty)
+                      _VisitorEmptyState(message: l10n.noTimelineUpdates)
+                    else
+                      for (final item in visitor.timeline)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _TimelineCard(item: item),
+                        ),
+                    const SizedBox(height: 16),
+                    if (_canAttemptVisitorQr(visitor)) ...[
+                      LuxuryButton(
+                        label: 'View QR Pass',
+                        icon: Icons.qr_code_2_rounded,
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showVisitorQrSheet(visitor);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                    ] else ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.goldSoft,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Text(
+                          'QR pass menunggu approval management.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: AppColors.navy,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    LuxuryButton(
+                      label: l10n.close,
+                      icon: Icons.check_rounded,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _visitorPurposeLabel(VisitorAccessRecord visitor) {
+    final purpose = visitor.visitPurpose.trim();
+    return purpose.isEmpty ? '-' : purpose;
+  }
+
+  String _visitScheduleLabel(VisitorAccessRecord visitor) {
+    final date = _formatVisitorDate(visitor.visitDate);
+    final time = visitor.estimatedArrivalTime.trim();
+    if (date == '-' && time.isEmpty) {
+      return '-';
+    }
+    if (time.isEmpty) {
+      return date;
+    }
+    return '$date, $time';
+  }
+
+  String _formatVisitorDate(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) {
+      return '-';
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value;
+    }
+    return _dateTimeFormat.format(parsed.toLocal());
+  }
+
+  String _dashIfEmpty(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? '-' : trimmed;
+  }
+
+  String _qrAccessCode(VisitorQrPass qrPass, VisitorAccessRecord? visitor) {
+    final accessCode = qrPass.accessCode.trim();
+    if (accessCode.isNotEmpty) {
+      return accessCode;
+    }
+    final accessCard = visitor?.accessCardNumber.trim();
+    if (accessCard != null && accessCard.isNotEmpty) {
+      return accessCard;
+    }
+    return 'VISITOR-${qrPass.visitorId}';
   }
 }
 
@@ -890,107 +1656,77 @@ class _ChoiceWrap<T> extends StatelessWidget {
   }
 }
 
-class _CalendarCard extends StatelessWidget {
-  const _CalendarCard({required this.selectedDay});
+class _DatePickerCard extends StatelessWidget {
+  const _DatePickerCard({required this.selectedDate, required this.onTap});
 
-  final int selectedDay;
+  final DateTime? selectedDate;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const days = [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8,
-      9,
-      10,
-      11,
-      12,
-      13,
-      14,
-      15,
-      16,
-      17,
-      18,
-      19,
-      20,
-      21,
-    ];
+    final dateLabel = selectedDate == null
+        ? 'Select visit date'
+        : DateFormat('dd MMM yyyy').format(selectedDate!);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                'June 2026',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
+    return InkWell(
+      key: const ValueKey('visitor-visit-date-picker'),
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.goldSoft,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.22),
                 ),
               ),
-              const Spacer(),
-              const Icon(Icons.chevron_left_rounded, color: AppColors.navy),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.navy),
-            ],
-          ),
-          const SizedBox(height: 14),
-          GridView.count(
-            crossAxisCount: 7,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1,
-            children: [
-              for (final day in weekDays)
-                Center(
-                  child: Text(
-                    day,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              child: const Icon(
+                Icons.calendar_month_outlined,
+                color: AppColors.gold,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Visit Date',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: AppColors.textMuted,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-              for (final day in days)
-                Center(
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: day == selectedDay
-                          ? AppColors.navy
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: day == selectedDay
-                          ? null
-                          : Border.all(color: AppColors.borderSoft),
-                    ),
-                    child: Text(
-                      '$day',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: day == selectedDay
-                            ? Colors.white
-                            : AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    dateLabel,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: selectedDate == null
+                          ? AppColors.textSecondary
+                          : AppColors.navy,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ),
-            ],
-          ),
-        ],
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: AppColors.navy,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1031,6 +1767,177 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DetailPanel extends StatelessWidget {
+  const _DetailPanel({required this.rows});
+
+  final List<(String, String)> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Column(
+        children: [
+          for (var index = 0; index < rows.length; index++) ...[
+            _InfoRow(label: rows[index].$1, value: rows[index].$2),
+            if (index != rows.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StaticPill extends StatelessWidget {
+  const _StaticPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.goldSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.18)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.gold,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineCard extends StatelessWidget {
+  const _TimelineCard({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _readTimelineValue(item, ['label', 'status', 'title']);
+    final timestamp = _readTimelineValue(item, [
+      'timestamp',
+      'created_at',
+      'time',
+    ]);
+
+    return WhitePremiumCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.timeline_rounded, color: AppColors.gold),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.isEmpty ? 'Timeline update' : label,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (timestamp.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    timestamp,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VisitorLoadingState extends StatelessWidget {
+  const _VisitorLoadingState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 2.4),
+        ),
+        const SizedBox(height: 14),
+        Text(message, textAlign: TextAlign.center),
+      ],
+    );
+  }
+}
+
+class _VisitorErrorState extends StatelessWidget {
+  const _VisitorErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Column(
+      children: [
+        const Icon(
+          Icons.error_outline_rounded,
+          color: AppColors.warning,
+          size: 34,
+        ),
+        const SizedBox(height: 12),
+        Text(message, textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        LuxuryButton(
+          label: l10n.retry,
+          icon: Icons.refresh_rounded,
+          onPressed: onRetry,
+        ),
+      ],
+    );
+  }
+}
+
+class _VisitorEmptyState extends StatelessWidget {
+  const _VisitorEmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      message,
+      textAlign: TextAlign.center,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
     );
   }
 }
@@ -1089,4 +1996,14 @@ String _initials(String name) {
   }
   return '${parts.first.characters.first}${parts.last.characters.first}'
       .toUpperCase();
+}
+
+String _readTimelineValue(Map<String, dynamic> item, List<String> keys) {
+  for (final key in keys) {
+    final value = item[key];
+    if (value != null && value.toString().trim().isNotEmpty) {
+      return value.toString();
+    }
+  }
+  return '';
 }

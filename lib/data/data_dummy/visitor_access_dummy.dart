@@ -1,5 +1,5 @@
-class VisitorAccessRecord {
-  const VisitorAccessRecord({
+class VisitorAccessDummyRecord {
+  const VisitorAccessDummyRecord({
     required this.visitorName,
     required this.purpose,
     required this.dateTime,
@@ -48,7 +48,7 @@ class VisitorAccessDummy {
   ];
 
   static final seedHistory = [
-    VisitorAccessRecord(
+    VisitorAccessDummyRecord(
       visitorName: 'John Doe',
       purpose: 'Visit Family',
       dateTime: DateTime(2026, 6, 8, 14, 3),
@@ -56,7 +56,7 @@ class VisitorAccessDummy {
       status: 'Checked In',
       vehicleNumber: 'B 1234 ABC',
     ),
-    VisitorAccessRecord(
+    VisitorAccessDummyRecord(
       visitorName: 'Michael Tan',
       purpose: 'Business Meeting',
       dateTime: DateTime(2026, 6, 5, 10, 15),
@@ -64,7 +64,7 @@ class VisitorAccessDummy {
       status: 'Checked Out',
       vehicleNumber: 'B 2026 MT',
     ),
-    VisitorAccessRecord(
+    VisitorAccessDummyRecord(
       visitorName: 'Sarah Lim',
       purpose: 'Private Guest',
       dateTime: DateTime(2026, 6, 12, 16, 0),

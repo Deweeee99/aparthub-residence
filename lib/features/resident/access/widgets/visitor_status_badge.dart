@@ -9,13 +9,15 @@ class VisitorStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
-      'Checked In' => AppColors.success,
-      'Checked Out' => AppColors.textMuted,
-      'Upcoming' => AppColors.info,
-      'Generated' => AppColors.gold,
+    final normalized = status.trim().toLowerCase();
+    final color = switch (normalized) {
+      'approved' || 'checked in' => AppColors.success,
+      'pending' || 'generated' || 'upcoming' => AppColors.gold,
+      'rejected' || 'cancelled' => AppColors.danger,
+      'checked out' || 'expired' => AppColors.textMuted,
       _ => AppColors.textSecondary,
     };
+    final label = status.trim().isEmpty ? '-' : status;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
@@ -25,7 +27,7 @@ class VisitorStatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
-        status,
+        label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: color,
           fontWeight: FontWeight.w900,

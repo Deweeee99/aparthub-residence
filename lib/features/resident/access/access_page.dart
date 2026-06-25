@@ -4,17 +4,16 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/white_premium_card.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/resident_user.dart';
+import '../../../services/api_service.dart';
 import 'visitor_management_page.dart';
 
 enum _AccessSubview { hub, create, history }
 
 class AccessPage extends StatefulWidget {
-  const AccessPage({
-    super.key,
-    this.resident,
-  });
+  const AccessPage({super.key, this.resident, this.apiService});
 
   final ResidentUser? resident;
+  final ApiService? apiService;
 
   @override
   State<AccessPage> createState() => _AccessPageState();
@@ -44,11 +43,13 @@ class _AccessPageState extends State<AccessPage> {
           key: const ValueKey('visitor-create-flow'),
           onBack: _backToHub,
           initialMode: VisitorManagementInitialMode.create,
+          apiService: widget.apiService,
         ),
         _AccessSubview.history => VisitorManagementPage(
           key: const ValueKey('visitor-history-flow'),
           onBack: _backToHub,
           initialMode: VisitorManagementInitialMode.history,
+          apiService: widget.apiService,
         ),
         _ => _AccessHub(
           key: const ValueKey('visitor-access-hub'),
@@ -206,16 +207,16 @@ class _AccessHero extends StatelessWidget {
                   Text(
                     l10n.visitorAccess,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Kelola kunjungan tamu dan akses QR secara aman.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                        ),
+                      color: Colors.white.withValues(alpha: 0.84),
+                    ),
                   ),
                 ],
               ),
@@ -228,9 +229,7 @@ class _AccessHero extends StatelessWidget {
 }
 
 class _ResidentUnitCard extends StatelessWidget {
-  const _ResidentUnitCard({
-    required this.resident,
-  });
+  const _ResidentUnitCard({required this.resident});
 
   final ResidentUser? resident;
 
@@ -268,9 +267,9 @@ class _ResidentUnitCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.navy,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 5),
                   Text(
@@ -278,8 +277,8 @@ class _ResidentUnitCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -338,10 +337,10 @@ class _AccessActionCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.navy,
-                  fontWeight: FontWeight.w900,
-                  height: 1.14,
-                ),
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+              height: 1.14,
+            ),
           ),
           const SizedBox(height: 7),
           Expanded(
@@ -350,9 +349,9 @@ class _AccessActionCard extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.3,
-                  ),
+                color: AppColors.textSecondary,
+                height: 1.3,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -364,9 +363,9 @@ class _AccessActionCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: accentColor,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: accentColor,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               Icon(Icons.arrow_forward_rounded, color: accentColor, size: 18),
@@ -411,17 +410,17 @@ class _AccessInformationCard extends StatelessWidget {
                 Text(
                   l10n.visitorQrPass,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Setiap visitor yang didaftarkan akan memiliki QR pass untuk proses verifikasi oleh security saat masuk.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.4,
-                      ),
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -442,10 +441,10 @@ class _SectionHeader extends StatelessWidget {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.navy,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.2,
-          ),
+        color: AppColors.navy,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.2,
+      ),
     );
   }
 }
@@ -477,10 +476,7 @@ String _residentUnitLabel(BuildContext context, ResidentUnit? unit) {
   return parts.join(' • ');
 }
 
-String _withLabelIfNeeded({
-  required String label,
-  required String value,
-}) {
+String _withLabelIfNeeded({required String label, required String value}) {
   final normalizedValue = value.toLowerCase();
   final normalizedLabel = label.toLowerCase();
 

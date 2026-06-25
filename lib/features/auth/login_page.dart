@@ -375,62 +375,62 @@ class _LoginHero extends StatelessWidget {
   }
 }
 
-class _LoginSecurityNotice extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+// class _LoginSecurityNotice extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     final l10n = AppLocalizations.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: AppColors.blueSoft,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.navy.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.verified_user_outlined,
-              color: AppColors.navy,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.secureAccessTitle,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppColors.navy,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.secureResidentAccess,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+//     return Container(
+//       padding: const EdgeInsets.all(15),
+//       decoration: BoxDecoration(
+//         color: AppColors.blueSoft,
+//         borderRadius: BorderRadius.circular(18),
+//         border: Border.all(color: AppColors.navy.withValues(alpha: 0.10)),
+//       ),
+//       child: Row(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Container(
+//             width: 42,
+//             height: 42,
+//             decoration: BoxDecoration(
+//               color: Colors.white,
+//               borderRadius: BorderRadius.circular(14),
+//             ),
+//             child: const Icon(
+//               Icons.verified_user_outlined,
+//               color: AppColors.navy,
+//               size: 22,
+//             ),
+//           ),
+//           const SizedBox(width: 16),
+//           Expanded(
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(
+//                   l10n.secureAccessTitle,
+//                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
+//                     color: AppColors.navy,
+//                     fontWeight: FontWeight.w900,
+//                   ),
+//                 ),
+//                 const SizedBox(height: 4),
+//                 Text(
+//                   l10n.secureResidentAccess,
+//                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
+//                     color: AppColors.textSecondary,
+//                     height: 1.35,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
 class _InputLabel extends StatelessWidget {
   const _InputLabel({required this.text});

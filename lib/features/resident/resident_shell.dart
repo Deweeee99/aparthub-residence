@@ -91,9 +91,7 @@ class _ResidentShellState extends State<ResidentShell> {
           _index = 0;
         }),
       ),
-      AccessPage(
-        resident: _resident,
-      ),
+      AccessPage(resident: _resident, apiService: _apiService),
       const ServicesPage(),
       CommunityPage(apiService: _apiService),
       ProfilePage(

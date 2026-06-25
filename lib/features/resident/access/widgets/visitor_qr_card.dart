@@ -14,6 +14,7 @@ class VisitorQrCard extends StatelessWidget {
     required this.visitorName,
     required this.schedule,
     required this.status,
+    this.qrPayload,
     this.countdownText,
     this.onShare,
   });
@@ -23,12 +24,15 @@ class VisitorQrCard extends StatelessWidget {
   final String visitorName;
   final String schedule;
   final String status;
+  final String? qrPayload;
   final String? countdownText;
   final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final qrData = (qrPayload?.trim().isNotEmpty == true ? qrPayload : code)
+        ?.trim();
 
     return WhitePremiumCard(
       padding: const EdgeInsets.all(20),
@@ -66,7 +70,9 @@ class VisitorQrCard extends StatelessWidget {
               ],
             ),
             child: QrImageView(
-              data: code,
+              data: qrData?.isNotEmpty == true
+                  ? qrData!
+                  : 'VISITOR-PASS-UNAVAILABLE',
               version: QrVersions.auto,
               size: 176,
               backgroundColor: Colors.white,

@@ -6,6 +6,7 @@ import 'package:aparthub_residance/app.dart';
 import 'package:aparthub_residance/models/resident_user.dart';
 import 'package:aparthub_residance/models/community_announcement_models.dart';
 import 'package:aparthub_residance/models/service_request_models.dart';
+import 'package:aparthub_residance/models/visitor_access_models.dart';
 import 'package:aparthub_residance/core/theme/app_theme.dart';
 import 'package:aparthub_residance/core/widgets/luxury_button.dart';
 import 'package:aparthub_residance/features/auth/login_page.dart';
@@ -27,6 +28,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -627,8 +629,8 @@ void main() {
     await _pumpAccessPage(tester);
 
     expect(find.text('Visitor Access'), findsOneWidget);
-    expect(find.text('Create Visitor Access'), findsOneWidget);
-    expect(find.text('Visitor History'), findsOneWidget);
+    expect(find.text('Register Visitor'), findsWidgets);
+    expect(find.text('View History'), findsOneWidget);
     expect(find.text('Parking Access'), findsNothing);
     expect(find.text('Delivery Access'), findsNothing);
     expect(find.text('Guest Access'), findsNothing);
@@ -637,36 +639,160 @@ void main() {
   testWidgets('access hub opens create flow and history', (tester) async {
     await _pumpAccessPage(tester);
 
-    await tester.tap(find.text('Create Visitor Access'));
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Register Visitor'), findsOneWidget);
+    expect(find.text('Register Visitor'), findsWidgets);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Visitor History'));
+    await tester.ensureVisible(find.text('View History'));
+    await tester.tap(find.text('View History'));
     await tester.pumpAndSettle();
 
     expect(
       find.text('Track all visitor activity and check-in records.'),
       findsOneWidget,
     );
-    expect(find.text('Michael Tan'), findsOneWidget);
+    expect(find.text('Raka Pratama'), findsOneWidget);
+  });
+
+  testWidgets('visitor register starts without dummy defaults', (tester) async {
+    await _pumpAccessPage(tester);
+
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('John Doe'), findsNothing);
+    expect(find.text('+62 812-3456-7890'), findsNothing);
+    expect(find.text('Select visit date'), findsNothing);
+
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+
+    expect(find.text('Nama visitor wajib diisi.'), findsOneWidget);
+  });
+
+  testWidgets('visitor history loads api data and opens detail by id', (
+    tester,
+  ) async {
+    final api = FakeApiService();
+    await _pumpAccessPage(tester, apiService: api);
+
+    await tester.ensureVisible(find.text('View History'));
+    await tester.tap(find.text('View History'));
+    await tester.pumpAndSettle();
+
+    expect(api.getVisitorsCalls, 1);
+    expect(api.lastVisitorStatus, isNull);
+    expect(find.text('Raka Pratama'), findsOneWidget);
+    expect(find.text('Approved'), findsWidgets);
+
+    await tester.tap(find.text('Raka Pratama'));
+    await tester.pumpAndSettle();
+
+    expect(api.getVisitorDetailCalls, 1);
+    expect(api.lastVisitorDetailId, 41);
+    expect(find.text('+62 812-0000-0001'), findsOneWidget);
+    expect(find.text('AC-001'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('View QR Pass'));
+    await tester.tap(find.text('View QR Pass'));
+    await tester.pumpAndSettle();
+
+    expect(api.getVisitorQrCalls, 1);
+    expect(api.lastVisitorQrId, 41);
+    expect(find.text('AC-41'), findsWidgets);
+  });
+
+  testWidgets(
+    'approved visitor detail can open qr even when qr flag is false',
+    (tester) async {
+      final api = FakeApiService(
+        visitorDetail: _visitorDetailRecord(qrAvailable: false),
+      );
+      await _pumpAccessPage(tester, apiService: api);
+
+      await tester.ensureVisible(find.text('View History'));
+      await tester.tap(find.text('View History'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Raka Pratama'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Approved'), findsWidgets);
+      expect(find.text('View QR Pass'), findsOneWidget);
+
+      await tester.tap(find.text('View QR Pass'));
+      await tester.pumpAndSettle();
+
+      expect(api.getVisitorQrCalls, 1);
+      expect(api.lastVisitorQrId, 41);
+      expect(find.text('AC-41'), findsWidgets);
+    },
+  );
+
+  testWidgets('visitor history status filter calls api with selected status', (
+    tester,
+  ) async {
+    final api = FakeApiService();
+    await _pumpAccessPage(tester, apiService: api);
+
+    await tester.ensureVisible(find.text('View History'));
+    await tester.tap(find.text('View History'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pending'));
+    await tester.pumpAndSettle();
+
+    expect(api.getVisitorsCalls, 2);
+    expect(api.lastVisitorStatus, 'Pending');
+  });
+
+  testWidgets('visitor history api failure shows friendly error', (
+    tester,
+  ) async {
+    await _pumpAccessPage(
+      tester,
+      apiService: FakeApiService(
+        visitorsError: const ApiServiceException(
+          'Data visitor belum bisa dimuat. Coba lagi.',
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('View History'));
+    await tester.tap(find.text('View History'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Data visitor belum bisa dimuat. Coba lagi.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('visitor management completes create flow to history', (
     tester,
   ) async {
-    await _pumpAccessPage(tester);
+    final api = FakeApiService();
+    await _pumpAccessPage(tester, apiService: api);
 
-    await tester.tap(find.text('Create Visitor Access'));
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
     await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const ValueKey('visitor-name-field')),
       'Alex Morgan',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    expect(find.text('Vehicle Number (Optional)'), findsNothing);
     await tester.drag(
       find.byKey(const ValueKey('visitor-management-page')),
       const Offset(0, -520),
@@ -675,7 +801,15 @@ void main() {
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Schedule Visit'), findsOneWidget);
+    expect(find.text('Schedule Visit'), findsWidgets);
+    expect(find.text('Expected Duration'), findsNothing);
+    expect(find.text('Select visit date'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
 
     await tester.drag(
       find.byKey(const ValueKey('visitor-management-page')),
@@ -685,41 +819,200 @@ void main() {
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
+    expect(api.createVisitorCalls, 1);
+    expect(api.getVisitorQrCalls, 1);
+    expect(api.lastVisitorQrId, 55);
+    expect(api.lastCreateVisitorName, 'Alex Morgan');
+    expect(api.lastCreateVisitorPhone, '+62 812-3456-7890');
+    expect(
+      api.lastCreateVisitDate,
+      DateFormat('yyyy-MM-dd').format(DateTime.now()),
+    );
+    expect(api.lastCreateEstimatedArrivalTime, '14:00');
+    expect(api.lastCreateGuestCount, 1);
+    expect(api.lastCreateVisitPurpose, 'Visit Family');
     expect(find.text('PASS GENERATED'), findsOneWidget);
+    expect(find.text('AC-055'), findsWidgets);
+    expect(find.text('Approved'), findsWidgets);
 
-    await tester.ensureVisible(find.text('Share Visitor Pass'));
-    await tester.tap(find.text('Share Visitor Pass'));
+    await tester.ensureVisible(find.text('View History'));
+    await tester.tap(find.text('View History'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Share Visitor Pass'), findsOneWidget);
+    expect(find.text('Visitor History'), findsWidgets);
+    expect(api.getVisitorsCalls, greaterThanOrEqualTo(1));
+    expect(find.text('Raka Pratama'), findsOneWidget);
+    expect(find.text('John Doe'), findsNothing);
+    expect(find.text('Michael Tan'), findsNothing);
+  });
 
-    await tester.ensureVisible(find.text('Copy Link'));
-    await tester.tap(find.text('Copy Link'));
+  testWidgets('visitor create shows pending message when qr unavailable', (
+    tester,
+  ) async {
+    final api = FakeApiService(
+      createdVisitor: _createdVisitorRecord(qrAvailable: false),
+      visitorDetail: _createdVisitorRecord(qrAvailable: false),
+    );
+    await _pumpAccessPage(tester, apiService: api);
+
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('QR pass menunggu approval management.'), findsOneWidget);
+    expect(find.text('Pending'), findsWidgets);
+    expect(api.getVisitorQrCalls, 0);
+
+    await tester.tap(find.text('Check Approval / Refresh QR'));
+    await tester.pumpAndSettle();
+
+    expect(api.getVisitorDetailCalls, 1);
+    expect(api.lastVisitorDetailId, 55);
+    expect(api.getVisitorQrCalls, 0);
+  });
+
+  testWidgets('visitor pending pass refreshes approval and loads qr', (
+    tester,
+  ) async {
+    final api = FakeApiService(
+      createdVisitor: _createdVisitorRecord(qrAvailable: false),
+      visitorDetail: _createdVisitorRecord(
+        qrAvailable: false,
+        status: 'Approved',
+      ),
+    );
+    await _pumpAccessPage(tester, apiService: api);
+
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('QR pass menunggu approval management.'), findsOneWidget);
+    expect(api.getVisitorQrCalls, 0);
+
+    await tester.tap(find.text('Check Approval / Refresh QR'));
+    await tester.pumpAndSettle();
+
+    expect(api.getVisitorDetailCalls, 1);
+    expect(api.lastVisitorDetailId, 55);
+    expect(api.getVisitorQrCalls, 1);
+    expect(api.lastVisitorQrId, 55);
+    expect(find.text('AC-055'), findsWidgets);
+  });
+
+  testWidgets('visitor create shows qr retry when qr endpoint fails', (
+    tester,
+  ) async {
+    final api = FakeApiService(
+      visitorQrError: const ApiServiceException(
+        'QR visitor belum bisa dimuat. Coba lagi.',
+      ),
+    );
+    await _pumpAccessPage(tester, apiService: api);
+
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(api.createVisitorCalls, 1);
+    expect(api.getVisitorQrCalls, 1);
+    expect(
+      find.text('QR visitor belum bisa dimuat. Coba lagi.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsOneWidget);
+  });
+
+  testWidgets('visitor create failure shows friendly snackbar', (tester) async {
+    await _pumpAccessPage(
+      tester,
+      apiService: FakeApiService(
+        createVisitorError: const ApiServiceException(
+          'Registrasi visitor belum bisa dibuat. Coba lagi.',
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Register Visitor').last);
+    await tester.tap(find.text('Register Visitor').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
     await tester.pump();
 
-    expect(find.text('Visitor pass link copied'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Continue to Verification'));
-    await tester.tap(find.text('Continue to Verification'));
-    await tester.pump();
-
-    expect(find.text('Scanning visitor pass...'), findsOneWidget);
-
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pumpAndSettle();
-
-    expect(find.text('QR Verified'), findsOneWidget);
-
-    await tester.tap(find.text('Access Approved'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Check-In Successful'), findsOneWidget);
-
-    await tester.tap(find.text('Done'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Visitor History'), findsOneWidget);
-    expect(find.text('Alex Morgan'), findsOneWidget);
+    expect(
+      find.text('Registrasi visitor belum bisa dibuat. Coba lagi.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('services hub shows request and history only', (tester) async {
@@ -1452,10 +1745,21 @@ void main() {
   );
 }
 
-Future<void> _pumpAccessPage(WidgetTester tester) async {
+Future<void> _pumpAccessPage(
+  WidgetTester tester, {
+  ApiService? apiService,
+  Locale locale = const Locale('en'),
+}) async {
   await initializeDateFormatting('id_ID');
+  await tester.binding.setSurfaceSize(const Size(800, 1400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
-    _localizedMaterialApp(home: const Scaffold(body: AccessPage())),
+    _localizedMaterialApp(
+      home: Scaffold(
+        body: AccessPage(apiService: apiService ?? FakeApiService()),
+      ),
+      locale: locale,
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -1607,6 +1911,14 @@ class FakeApiService implements ApiService {
     this.announcementDetailError,
     this.announcementListCompleter,
     this.announcementDetailCompleter,
+    this.visitors,
+    this.visitorsError,
+    this.visitorDetail,
+    this.visitorDetailError,
+    this.createdVisitor,
+    this.createVisitorError,
+    this.visitorQrPass,
+    this.visitorQrError,
   });
 
   final FakeAuthStorageService? storage;
@@ -1630,6 +1942,14 @@ class FakeApiService implements ApiService {
   final Object? announcementDetailError;
   final Completer<List<CommunityAnnouncement>>? announcementListCompleter;
   final Completer<CommunityAnnouncement>? announcementDetailCompleter;
+  final List<VisitorAccessRecord>? visitors;
+  final Object? visitorsError;
+  final VisitorAccessRecord? visitorDetail;
+  final Object? visitorDetailError;
+  final VisitorAccessRecord? createdVisitor;
+  final Object? createVisitorError;
+  final VisitorQrPass? visitorQrPass;
+  final Object? visitorQrError;
 
   int loginCalls = 0;
   int meCalls = 0;
@@ -1640,6 +1960,19 @@ class FakeApiService implements ApiService {
   int getDetailCalls = 0;
   int getAnnouncementsCalls = 0;
   int getAnnouncementDetailCalls = 0;
+  int getVisitorsCalls = 0;
+  int getVisitorDetailCalls = 0;
+  int createVisitorCalls = 0;
+  int getVisitorQrCalls = 0;
+  int? lastVisitorDetailId;
+  int? lastVisitorQrId;
+  String? lastVisitorStatus;
+  String? lastCreateVisitorName;
+  String? lastCreateVisitorPhone;
+  String? lastCreateVisitDate;
+  String? lastCreateEstimatedArrivalTime;
+  int? lastCreateGuestCount;
+  String? lastCreateVisitPurpose;
   int? lastDetailTicketId;
   int? lastCreateCategoryId;
   int? lastCreateSubcategoryId;
@@ -1802,6 +2135,186 @@ class FakeApiService implements ApiService {
     }
     return announcementDetail ?? _communityAnnouncementDetail();
   }
+
+  @override
+  Future<List<VisitorAccessRecord>> getResidentVisitors({
+    String? status,
+  }) async {
+    getVisitorsCalls += 1;
+    lastVisitorStatus = status;
+    if (visitorsError != null) {
+      throw visitorsError!;
+    }
+    return List<VisitorAccessRecord>.of(visitors ?? _visitorRecords());
+  }
+
+  @override
+  Future<VisitorAccessRecord> getResidentVisitorDetail(int visitorId) async {
+    getVisitorDetailCalls += 1;
+    lastVisitorDetailId = visitorId;
+    if (visitorDetailError != null) {
+      throw visitorDetailError!;
+    }
+    return visitorDetail ?? _visitorDetailRecord();
+  }
+
+  @override
+  Future<VisitorAccessRecord> createResidentVisitor({
+    required String visitorName,
+    required String visitorPhone,
+    required String visitDate,
+    required String estimatedArrivalTime,
+    required int guestCount,
+    required String visitPurpose,
+  }) async {
+    createVisitorCalls += 1;
+    lastCreateVisitorName = visitorName;
+    lastCreateVisitorPhone = visitorPhone;
+    lastCreateVisitDate = visitDate;
+    lastCreateEstimatedArrivalTime = estimatedArrivalTime;
+    lastCreateGuestCount = guestCount;
+    lastCreateVisitPurpose = visitPurpose;
+    if (createVisitorError != null) {
+      throw createVisitorError!;
+    }
+    return createdVisitor ?? _createdVisitorRecord();
+  }
+
+  @override
+  Future<VisitorQrPass> getResidentVisitorQr(int visitorId) async {
+    getVisitorQrCalls += 1;
+    lastVisitorQrId = visitorId;
+    if (visitorQrError != null) {
+      throw visitorQrError!;
+    }
+    return visitorQrPass ?? _visitorQrPass(visitorId: visitorId);
+  }
+}
+
+List<VisitorAccessRecord> _visitorRecords() {
+  return const [
+    VisitorAccessRecord(
+      id: 41,
+      visitorName: 'Raka Pratama',
+      visitorPhone: '+62 812-0000-0001',
+      visitDate: '2026-06-25',
+      estimatedArrivalTime: '14:00',
+      guestCount: 2,
+      visitPurpose: 'Family Visit',
+      status: 'Approved',
+      registrationSource: 'Resident App',
+      qrAvailable: true,
+      approvedAt: '2026-06-24T10:00:00+07:00',
+      rejectedAt: '',
+      cancelledAt: '',
+      checkedInAt: '',
+      checkedOutAt: '',
+      expiresAt: '2026-06-25T18:00:00+07:00',
+      accessCardNumber: 'AC-001',
+      identityPhotoUrl: '',
+      unit: VisitorUnit(id: 1, code: 'A-1808', tower: 'Tower A', floor: 18),
+      timeline: [],
+      cancellationReason: '',
+      rejectionReason: '',
+    ),
+    VisitorAccessRecord(
+      id: 42,
+      visitorName: 'Maya Santoso',
+      visitorPhone: '+62 812-0000-0002',
+      visitDate: '2026-06-24',
+      estimatedArrivalTime: '10:30',
+      guestCount: 1,
+      visitPurpose: 'Delivery',
+      status: 'Checked In',
+      registrationSource: 'Resident App',
+      qrAvailable: true,
+      approvedAt: '2026-06-24T08:00:00+07:00',
+      rejectedAt: '',
+      cancelledAt: '',
+      checkedInAt: '2026-06-24T10:31:00+07:00',
+      checkedOutAt: '',
+      expiresAt: '2026-06-24T16:00:00+07:00',
+      accessCardNumber: 'AC-002',
+      identityPhotoUrl: '',
+      unit: VisitorUnit(id: 1, code: 'A-1808', tower: 'Tower A', floor: 18),
+      timeline: [],
+      cancellationReason: '',
+      rejectionReason: '',
+    ),
+  ];
+}
+
+VisitorAccessRecord _visitorDetailRecord({
+  bool qrAvailable = true,
+  String status = 'Approved',
+}) {
+  return VisitorAccessRecord(
+    id: 41,
+    visitorName: 'Raka Pratama',
+    visitorPhone: '+62 812-0000-0001',
+    visitDate: '2026-06-25',
+    estimatedArrivalTime: '14:00',
+    guestCount: 2,
+    visitPurpose: 'Family Visit',
+    status: status,
+    registrationSource: 'Resident App',
+    qrAvailable: qrAvailable,
+    approvedAt: '2026-06-24T10:00:00+07:00',
+    rejectedAt: '',
+    cancelledAt: '',
+    checkedInAt: '',
+    checkedOutAt: '',
+    expiresAt: '2026-06-25T18:00:00+07:00',
+    accessCardNumber: 'AC-001',
+    identityPhotoUrl: '',
+    unit: const VisitorUnit(id: 1, code: 'A-1808', tower: 'Tower A', floor: 18),
+    timeline: const [
+      {'label': 'Approved', 'timestamp': '2026-06-24T10:00:00+07:00'},
+    ],
+    cancellationReason: '',
+    rejectionReason: '',
+  );
+}
+
+VisitorAccessRecord _createdVisitorRecord({
+  bool qrAvailable = true,
+  String? status,
+}) {
+  final resolvedStatus = status ?? (qrAvailable ? 'Approved' : 'Pending');
+  return VisitorAccessRecord(
+    id: 55,
+    visitorName: 'Alex Morgan',
+    visitorPhone: '+62 812-3456-7890',
+    visitDate: '2026-06-08',
+    estimatedArrivalTime: '14:00',
+    guestCount: 2,
+    visitPurpose: 'Visit Family',
+    status: resolvedStatus,
+    registrationSource: 'Resident App',
+    qrAvailable: qrAvailable,
+    approvedAt: qrAvailable ? '2026-06-08T09:00:00+07:00' : '',
+    rejectedAt: '',
+    cancelledAt: '',
+    checkedInAt: '',
+    checkedOutAt: '',
+    expiresAt: qrAvailable ? '2026-06-08T16:00:00+07:00' : '',
+    accessCardNumber: qrAvailable ? 'AC-055' : '',
+    identityPhotoUrl: '',
+    unit: const VisitorUnit(id: 1, code: 'A-1808', tower: 'Tower A', floor: 18),
+    timeline: const [],
+    cancellationReason: '',
+    rejectionReason: '',
+  );
+}
+
+VisitorQrPass _visitorQrPass({int visitorId = 55}) {
+  return VisitorQrPass(
+    visitorId: visitorId,
+    qrPayload: 'VISITOR-QR-PAYLOAD-$visitorId',
+    accessCode: visitorId == 55 ? 'AC-055' : 'AC-$visitorId',
+    validUntil: '2026-06-08T16:00:00+07:00',
+    status: 'Approved',
+  );
 }
 
 List<CommunityAnnouncement> _communityAnnouncements() {

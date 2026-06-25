@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/community_announcement_models.dart';
 import '../models/resident_user.dart';
 import '../models/service_request_models.dart';
+import '../models/visitor_access_models.dart';
 import 'api_client.dart';
 import 'app_debug_logger.dart';
 import 'auth_storage_service.dart';
@@ -266,6 +267,154 @@ class ApiService {
       throw _mapToFriendlyException(
         error,
         fallback: 'Detail pengumuman belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<List<VisitorAccessRecord>> getResidentVisitors({
+    String? status,
+  }) async {
+    final token = await _requireToken();
+    final normalizedStatus = status?.trim();
+    final queryParameters =
+        normalizedStatus == null ||
+            normalizedStatus.isEmpty ||
+            normalizedStatus.toLowerCase() == 'all'
+        ? null
+        : {'status': normalizedStatus};
+
+    appDebugLog(
+      'ApiService',
+      'Fetching resident visitors${queryParameters == null ? '' : ' with status "$normalizedStatus"'}',
+    );
+
+    try {
+      final response = await _client.get(
+        '/resident/visitors',
+        token: token,
+        queryParameters: queryParameters,
+      );
+      final data = _readResponseList(response.data);
+      final visitors = data
+          .map((item) => VisitorAccessRecord.fromJson(item))
+          .toList();
+      appDebugLog(
+        'ApiService',
+        'Resident visitors loaded (${response.statusCode ?? 'no-status'}) with ${visitors.length} items',
+      );
+      return visitors;
+    } catch (error) {
+      appDebugLog('ApiService', 'Resident visitors failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Data visitor belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<VisitorAccessRecord> getResidentVisitorDetail(int visitorId) async {
+    final token = await _requireToken();
+    appDebugLog(
+      'ApiService',
+      'Fetching resident visitor detail for $visitorId',
+    );
+
+    try {
+      final response = await _client.get(
+        '/resident/visitors/$visitorId',
+        token: token,
+      );
+      final data = _readResponseData(response.data);
+      final visitor = VisitorAccessRecord.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Resident visitor detail loaded (${response.statusCode ?? 'no-status'}) for ${visitor.id}',
+      );
+      return visitor;
+    } catch (error) {
+      appDebugLog('ApiService', 'Resident visitor detail failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Detail visitor belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<VisitorQrPass> getResidentVisitorQr(int visitorId) async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Fetching resident visitor QR for $visitorId');
+
+    try {
+      final response = await _client.get(
+        '/resident/visitors/$visitorId/qr',
+        token: token,
+      );
+      final data = _readResponseData(response.data);
+      final qrPass = VisitorQrPass.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Resident visitor QR loaded (${response.statusCode ?? 'no-status'}) for ${qrPass.visitorId}; status="${qrPass.status}", hasPayload=${qrPass.qrPayload.trim().isNotEmpty}, hasAccessCode=${qrPass.accessCode.trim().isNotEmpty}, validUntil="${qrPass.validUntil}"',
+      );
+      return qrPass;
+    } on DioException catch (error) {
+      appDebugLog(
+        'ApiService',
+        'Resident visitor QR failed: status=${error.response?.statusCode}, body=${error.response?.data}',
+      );
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'QR visitor belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    } catch (error) {
+      appDebugLog('ApiService', 'Resident visitor QR failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'QR visitor belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<VisitorAccessRecord> createResidentVisitor({
+    required String visitorName,
+    required String visitorPhone,
+    required String visitDate,
+    required String estimatedArrivalTime,
+    required int guestCount,
+    required String visitPurpose,
+  }) async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Creating resident visitor registration');
+
+    try {
+      final response = await _client.post(
+        '/resident/visitors',
+        token: token,
+        data: {
+          'visitor_name': visitorName.trim(),
+          'visitor_phone': visitorPhone.trim(),
+          'visit_date': visitDate.trim(),
+          'estimated_arrival_time': estimatedArrivalTime.trim(),
+          'guest_count': guestCount,
+          'visit_purpose': visitPurpose.trim(),
+        },
+      );
+      final data = _readResponseData(response.data);
+      final visitor = VisitorAccessRecord.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Resident visitor registration created (${response.statusCode ?? 'no-status'}) with id ${visitor.id}',
+      );
+      return visitor;
+    } catch (error) {
+      appDebugLog('ApiService', 'Create resident visitor failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Registrasi visitor belum bisa dibuat. Coba lagi.',
         unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
       );
     }
