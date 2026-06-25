@@ -111,23 +111,23 @@ class _LoginPageState extends State<LoginPage> {
                 onLogin: _handleLogin,
               ).animate().fadeIn(duration: 420.ms).moveY(begin: 16, end: 0),
 
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                child: _LoginSecurityNotice(),
-              ).animate().fadeIn(delay: 240.ms, duration: 380.ms),
+              // Padding(
+              //   padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              //   child: _LoginSecurityNotice(),
+              // ).animate().fadeIn(delay: 240.ms, duration: 380.ms),
 
-              Padding(
-                padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
-                child: Text(
-                  AppLocalizations.of(context).secureResidentAccess,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.w700,
-                    height: 1.4,
-                  ),
-                ),
-              ).animate().fadeIn(delay: 340.ms, duration: 360.ms),
+              // Padding(
+              //   padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
+              //   child: Text(
+              //     AppLocalizations.of(context).secureResidentAccess,
+              //     textAlign: TextAlign.center,
+              //     style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              //       color: AppColors.textMuted,
+              //       fontWeight: FontWeight.w700,
+              //       height: 1.4,
+              //     ),
+              //   ),
+              // ).animate().fadeIn(delay: 340.ms, duration: 360.ms),
             ],
           ),
         ),

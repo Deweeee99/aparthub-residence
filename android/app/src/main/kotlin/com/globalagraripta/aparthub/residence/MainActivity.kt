@@ -1,0 +1,5 @@
+package com.globalagraripta.aparthub.residence
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()
