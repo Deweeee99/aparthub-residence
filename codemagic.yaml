@@ -14,17 +14,23 @@ workflows:
         bundle_identifier: com.globalagraripta.aparthub.residence
 
     scripts:
-      - name: Install Flutter dependencies
+      - name: Set up iOS signing
+        script: |
+          xcode-project use-profiles \
+            --custom-export-options='{"testFlightInternalTestingOnly": true}'
+
+      - name: Get Flutter packages
         script: |
           flutter pub get
 
-      - name: Apply iOS signing profiles
+      - name: Build ApartHub IPA
         script: |
-          xcode-project use-profiles
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
 
-      - name: Build IPA
+      - name: Verify IPA artifact
         script: |
-          flutter build ipa --release
+          ls -lah build/ios/ipa
 
     artifacts:
       - build/ios/ipa/*.ipa
