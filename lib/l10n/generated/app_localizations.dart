@@ -1322,6 +1322,102 @@ abstract class AppLocalizations {
   /// **'Assigned after activation'**
   String get assignedAfterActivation;
 
+  /// No description provided for @assigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned'**
+  String get assigned;
+
+  /// No description provided for @progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get progress;
+
+  /// No description provided for @completed.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get completed;
+
+  /// No description provided for @assignedToStaff.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned to Staff'**
+  String get assignedToStaff;
+
+  /// No description provided for @assignedToStaffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your request assignment follows the latest backend status.'**
+  String get assignedToStaffSubtitle;
+
+  /// No description provided for @technicianStaff.
+  ///
+  /// In en, this message translates to:
+  /// **'Technician / Staff'**
+  String get technicianStaff;
+
+  /// No description provided for @waitingForAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for assignment'**
+  String get waitingForAssignment;
+
+  /// No description provided for @assignmentPendingProgressLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress tracking will be available after management assigns staff.'**
+  String get assignmentPendingProgressLocked;
+
+  /// No description provided for @workInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Work In Progress'**
+  String get workInProgress;
+
+  /// No description provided for @workInProgressSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track backend status, timeline updates, SLA, and attachments.'**
+  String get workInProgressSubtitle;
+
+  /// No description provided for @requestCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Completed'**
+  String get requestCompleted;
+
+  /// No description provided for @requestCompletedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This service request has been completed by the service team.'**
+  String get requestCompletedSubtitle;
+
+  /// No description provided for @workNotCompletedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Work is not completed yet.'**
+  String get workNotCompletedYet;
+
+  /// No description provided for @completionPendingProgressLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion details will appear after management marks this request as completed.'**
+  String get completionPendingProgressLocked;
+
+  /// No description provided for @trackProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Track Progress'**
+  String get trackProgress;
+
+  /// No description provided for @viewCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'View Completion'**
+  String get viewCompletion;
+
   /// No description provided for @informationUnavailable.
   ///
   /// In en, this message translates to:
@@ -1387,6 +1483,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Good evening,'**
   String get goodNight;
+
+  /// No description provided for @continueToCheckIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to Check-In'**
+  String get continueToCheckIn;
+
+  /// No description provided for @viewStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'View Status'**
+  String get viewStatus;
 }
 
 class _AppLocalizationsDelegate

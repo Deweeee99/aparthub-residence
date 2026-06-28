@@ -11,11 +11,13 @@ import 'package:aparthub_residance/core/theme/app_theme.dart';
 import 'package:aparthub_residance/core/widgets/luxury_button.dart';
 import 'package:aparthub_residance/features/auth/login_page.dart';
 import 'package:aparthub_residance/features/resident/access/access_page.dart';
+import 'package:aparthub_residance/features/resident/access/visitor_management_page.dart';
 import 'package:aparthub_residance/features/resident/billing/billing_page.dart';
 import 'package:aparthub_residance/features/resident/community/community_page.dart';
 import 'package:aparthub_residance/features/resident/home/resident_home_page.dart';
 import 'package:aparthub_residance/features/resident/profile/profile_page.dart';
 import 'package:aparthub_residance/features/resident/resident_shell.dart';
+import 'package:aparthub_residance/features/resident/services/facility_booking_page.dart';
 import 'package:aparthub_residance/features/resident/services/service_request_page.dart';
 import 'package:aparthub_residance/features/resident/services/widgets/service_attachment_section.dart';
 import 'package:aparthub_residance/features/resident/services/services_page.dart';
@@ -350,6 +352,7 @@ void main() {
             ),
             onNavigate: (_) {},
             onOpenBilling: () {},
+            onOpenFacilityBooking: () {},
           ),
         ),
       ),
@@ -364,7 +367,7 @@ void main() {
     expect(find.text('Monthly billing status'), findsOneWidget);
     expect(find.text('Your Current Balance'), findsOneWidget);
     expect(find.text('Quick Access'), findsOneWidget);
-    expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('Booking'), findsOneWidget);
     expect(find.text('Good Evening, Nadia Resident'), findsOneWidget);
     expect(find.text('Tower Asteria'), findsOneWidget);
     expect(find.text('Unit A-1808'), findsOneWidget);
@@ -424,6 +427,7 @@ void main() {
             ),
             onNavigate: (_) {},
             onOpenBilling: () => opened = true,
+            onOpenFacilityBooking: () {},
           ),
         ),
       ),
@@ -445,6 +449,118 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
+  testWidgets('home booking quick action opens callback', (tester) async {
+    var opened = false;
+
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      _localizedMaterialApp(
+        home: Scaffold(
+          body: ResidentHomePage(
+            resident: _residentUser(),
+            apiService: FakeApiService(
+              residentAnnouncements: _communityAnnouncements(),
+            ),
+            onNavigate: (_) {},
+            onOpenBilling: () {},
+            onOpenFacilityBooking: () => opened = true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Booking'),
+      find.byKey(const ValueKey('resident-home-page')),
+      const Offset(0, -180),
+    );
+    await tester.tap(find.text('Booking'));
+    await tester.pumpAndSettle();
+
+    expect(opened, isTrue);
+    expect(find.text('Profile'), findsNothing);
+  });
+
+  testWidgets('facility booking creates local booking and opens history', (
+    tester,
+  ) async {
+    var wentBack = false;
+
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      _localizedMaterialApp(
+        home: Scaffold(
+          body: FacilityBookingPage(onBack: () => wentBack = true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Facility Booking'), findsOneWidget);
+    expect(find.text('Resident Facility'), findsNothing);
+    expect(find.text('Select Facility'), findsOneWidget);
+    expect(find.text('Gym'), findsOneWidget);
+
+    await tester.tap(find.text('Gym'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available Time Slots'), findsOneWidget);
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Booking Date'), findsOneWidget);
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm Booking'), findsWidgets);
+
+    await tester.tap(find.text('Confirm Booking').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Booking Confirmed'), findsOneWidget);
+    expect(find.text('Booking QR'), findsOneWidget);
+
+    await tester.tap(find.text('View Booking Details'));
+    await tester.pumpAndSettle();
+    expect(find.text('My Bookings'), findsOneWidget);
+    expect(find.textContaining('BK-'), findsWidgets);
+
+    await tester.tap(find.text('Back to Home'));
+    await tester.pumpAndSettle();
+    expect(wentBack, isTrue);
+  });
+
+  testWidgets('facility booking header back follows service flow behavior', (
+    tester,
+  ) async {
+    var wentBack = false;
+
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      _localizedMaterialApp(
+        home: Scaffold(
+          body: FacilityBookingPage(onBack: () => wentBack = true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gym'));
+    await tester.pumpAndSettle();
+    expect(find.text('Available Time Slots'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Select Facility'), findsOneWidget);
+    expect(wentBack, isFalse);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(wentBack, isTrue);
+  });
+
   testWidgets(
     'home today highlights loads api announcements and prioritizes pinned items',
     (tester) async {
@@ -462,6 +578,7 @@ void main() {
               apiService: api,
               onNavigate: (_) {},
               onOpenBilling: () {},
+              onOpenFacilityBooking: () {},
             ),
           ),
         ),
@@ -506,6 +623,7 @@ void main() {
             ),
             onNavigate: (_) {},
             onOpenBilling: () {},
+            onOpenFacilityBooking: () {},
           ),
         ),
       ),
@@ -550,6 +668,7 @@ void main() {
             ),
             onNavigate: (_) {},
             onOpenBilling: () {},
+            onOpenFacilityBooking: () {},
           ),
         ),
       ),
@@ -575,6 +694,7 @@ void main() {
             apiService: FakeApiService(residentAnnouncements: const []),
             onNavigate: (_) {},
             onOpenBilling: () {},
+            onOpenFacilityBooking: () {},
           ),
         ),
       ),
@@ -603,6 +723,7 @@ void main() {
             ),
             onNavigate: (_) {},
             onOpenBilling: () {},
+            onOpenFacilityBooking: () {},
           ),
         ),
       ),
@@ -831,6 +952,11 @@ void main() {
     expect(api.lastCreateEstimatedArrivalTime, '14:00');
     expect(api.lastCreateGuestCount, 1);
     expect(api.lastCreateVisitPurpose, 'Visit Family');
+    expect(find.text('QR Verified'), findsOneWidget);
+    await tester.ensureVisible(find.text('Lihat QR'));
+    await tester.tap(find.text('Lihat QR'));
+    await tester.pumpAndSettle();
+
     expect(find.text('PASS GENERATED'), findsOneWidget);
     expect(find.text('AC-055'), findsWidgets);
     expect(find.text('Approved'), findsWidgets);
@@ -877,7 +1003,7 @@ void main() {
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
-    expect(find.text('QR pass menunggu approval management.'), findsOneWidget);
+    expect(find.text('Menunggu Approval'), findsOneWidget);
     expect(find.text('Pending'), findsWidgets);
     expect(api.getVisitorQrCalls, 0);
 
@@ -923,7 +1049,7 @@ void main() {
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
-    expect(find.text('QR pass menunggu approval management.'), findsOneWidget);
+    expect(find.text('Menunggu Approval'), findsOneWidget);
     expect(api.getVisitorQrCalls, 0);
 
     await tester.tap(find.text('Check Approval / Refresh QR'));
@@ -975,6 +1101,158 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Retry'), findsOneWidget);
+  });
+
+  testWidgets('visitor share step shows whatsapp and copy link only', (
+    tester,
+  ) async {
+    final launchedUrls = <Uri>[];
+    final api = FakeApiService(
+      visitorQrPass: _visitorQrPass(
+        qrPayload: 'https://airaai.my.id/visitor-pass/55',
+      ),
+    );
+    await _pumpVisitorManagementPage(
+      tester,
+      apiService: api,
+      launchUrlOverride: (url) async {
+        launchedUrls.add(url);
+        return true;
+      },
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Lihat QR'));
+    await tester.tap(find.text('Lihat QR'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share Visitor Pass'));
+    await tester.tap(find.text('Share Visitor Pass'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WhatsApp'), findsOneWidget);
+    expect(find.text('Copy Link'), findsOneWidget);
+    expect(find.text('SMS'), findsNothing);
+    expect(find.text('Email'), findsNothing);
+    expect(find.text('More Options'), findsNothing);
+
+    await tester.tap(find.text('WhatsApp'));
+    await tester.pump();
+
+    expect(launchedUrls, hasLength(1));
+    expect(launchedUrls.single.scheme, 'whatsapp');
+    expect(launchedUrls.single.queryParameters['text'], contains('AC-055'));
+    expect(
+      launchedUrls.single.queryParameters['text'],
+      contains('https://airaai.my.id/visitor-pass/55'),
+    );
+  });
+
+  testWidgets('visitor copy link copies qr url when payload is url', (
+    tester,
+  ) async {
+    String? copiedText;
+    final api = FakeApiService(
+      visitorQrPass: _visitorQrPass(
+        qrPayload: 'https://airaai.my.id/visitor-pass/55',
+      ),
+    );
+    await _pumpVisitorManagementPage(
+      tester,
+      apiService: api,
+      copyTextOverride: (text) async => copiedText = text,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Lihat QR'));
+    await tester.tap(find.text('Lihat QR'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share Visitor Pass'));
+    await tester.tap(find.text('Share Visitor Pass'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy Link'));
+    await tester.pump();
+
+    expect(copiedText, 'https://airaai.my.id/visitor-pass/55');
+    expect(find.text('Visitor pass copied.'), findsOneWidget);
+  });
+
+  testWidgets('visitor copy link copies full pass text when payload is token', (
+    tester,
+  ) async {
+    String? copiedText;
+    await _pumpVisitorManagementPage(
+      tester,
+      apiService: FakeApiService(),
+      copyTextOverride: (text) async => copiedText = text,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-name-field')),
+      'Alex Morgan',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('visitor-phone-field')),
+      '+62 812-3456-7890',
+    );
+    await tester.tap(find.text('Visit Family'));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('visitor-visit-date-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14:00'));
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Lihat QR'));
+    await tester.tap(find.text('Lihat QR'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share Visitor Pass'));
+    await tester.tap(find.text('Share Visitor Pass'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy Link'));
+    await tester.pump();
+
+    expect(copiedText, contains('ApartHub Visitor Pass'));
+    expect(copiedText, contains('AC-055'));
+    expect(copiedText, contains('VISITOR-QR-PAYLOAD-55'));
   });
 
   testWidgets('visitor create failure shows friendly snackbar', (tester) async {
@@ -1316,10 +1594,7 @@ void main() {
       serviceDetail: _serviceDetailTicket(),
     );
 
-    await _pumpServicesPage(tester, apiService: api);
-
-    await tester.tap(find.text('Buat Laporan'));
-    await tester.pumpAndSettle();
+    await _pumpServiceRequestPage(tester, apiService: api);
     await tester.tap(find.text('Plumbing'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Kitchen Fixture'));
@@ -1344,12 +1619,27 @@ void main() {
     submitButton.onPressed.call();
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('View Detail'));
-    await tester.tap(find.text('View Detail'));
+    await tester.ensureVisible(find.text('Lihat Detail'));
+    await tester.tap(find.text('Lihat Detail'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Operational Time'), findsOneWidget);
+    expect(find.text('Ditugaskan ke Staff'), findsOneWidget);
+    expect(find.text('Dimas Engineering'), findsWidgets);
+    expect(api.lastDetailTicketId, 2450);
+
+    await tester.tap(find.text('Pantau Progres'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pekerjaan Berlangsung'), findsOneWidget);
+    expect(find.text('Waktu Operasional'), findsOneWidget);
     expect(find.text('24 Jun 2026, 08:45'), findsAtLeastNWidgets(1));
+    expect(find.text('Lihat Penyelesaian'), findsNothing);
+    expect(
+      find.text(
+        'Detail penyelesaian akan muncul setelah management menandai request ini selesai.',
+      ),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('service-attachment-image-1')),
       findsOneWidget,
@@ -1358,6 +1648,111 @@ void main() {
       find.byKey(const ValueKey('service-attachment-file-2')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('completed service detail opens completed step', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = FakeApiService(
+      serviceCatalog: _serviceCatalog(),
+      createdServiceTicket: _createdServiceTicket(),
+      serviceDetail: _completedServiceDetailTicket(),
+    );
+
+    await _pumpServiceRequestPage(tester, apiService: api);
+    await tester.tap(find.text('Plumbing'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kitchen Fixture'));
+    await tester.pumpAndSettle();
+    final continueButton = tester.widget<LuxuryButton>(
+      find.byKey(const ValueKey('continue-to-description-button')),
+    );
+    continueButton.onPressed.call();
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('service-title-field')),
+      'Leaky faucet',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('service-description-field')),
+      'Water dripping under the sink.',
+    );
+    final submitButton = tester.widget<LuxuryButton>(
+      find.byKey(const ValueKey('submit-service-request-button')),
+    );
+    submitButton.onPressed.call();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Lihat Detail'));
+    await tester.tap(find.text('Lihat Detail'));
+    await tester.pumpAndSettle();
+
+    expect(api.lastDetailTicketId, 2450);
+    expect(find.text('Request Selesai'), findsOneWidget);
+    expect(find.text('Completed'), findsWidgets);
+    expect(find.text('24 Jun 2026, 11:25'), findsOneWidget);
+  });
+
+  testWidgets('pull refresh updates tracking status to completed', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = FakeApiService(
+      serviceCatalog: _serviceCatalog(),
+      createdServiceTicket: _createdServiceTicket(),
+      serviceDetails: [_serviceDetailTicket(), _completedServiceDetailTicket()],
+    );
+
+    await _pumpServiceRequestPage(tester, apiService: api);
+    await tester.tap(find.text('Plumbing'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kitchen Fixture'));
+    await tester.pumpAndSettle();
+    final continueButton = tester.widget<LuxuryButton>(
+      find.byKey(const ValueKey('continue-to-description-button')),
+    );
+    continueButton.onPressed.call();
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('service-title-field')),
+      'Leaky faucet',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('service-description-field')),
+      'Water dripping under the sink.',
+    );
+    final submitButton = tester.widget<LuxuryButton>(
+      find.byKey(const ValueKey('submit-service-request-button')),
+    );
+    submitButton.onPressed.call();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Lihat Detail'));
+    await tester.tap(find.text('Lihat Detail'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pantau Progres'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pekerjaan Berlangsung'), findsOneWidget);
+    expect(find.text('Lihat Penyelesaian'), findsNothing);
+    expect(api.getDetailCalls, 1);
+
+    final refreshFuture = tester
+        .state<RefreshIndicatorState>(
+          find.byKey(const ValueKey('service-refresh-indicator')),
+        )
+        .show();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await refreshFuture;
+    await tester.pumpAndSettle();
+
+    expect(api.getDetailCalls, 2);
+    expect(find.text('Request Selesai'), findsOneWidget);
+    expect(find.text('24 Jun 2026, 11:25'), findsOneWidget);
   });
 
   testWidgets('service attachment url resolver repairs localhost urls', (
@@ -1402,7 +1797,7 @@ void main() {
 
     expect(find.text('Kitchen sink leakage'), findsOneWidget);
     expect(api.lastDetailTicketId, 2401);
-    expect(find.text('Attachments'), findsOneWidget);
+    expect(find.text('Lampiran'), findsOneWidget);
     expect(find.text('24 Jun 2026, 08:45'), findsAtLeastNWidgets(1));
     expect(
       find.byKey(const ValueKey('service-attachment-image-1')),
@@ -1413,7 +1808,15 @@ void main() {
       find.byKey(const ValueKey('service-attachment-file-2')),
       findsOneWidget,
     );
-    expect(find.text('Operational Time'), findsOneWidget);
+    expect(find.text('Waktu Operasional'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Lihat Status'));
+    await tester.tap(find.text('Lihat Status'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ditugaskan ke Staff'), findsOneWidget);
+    expect(find.text('Dimas Engineering'), findsWidgets);
+    expect(find.text('Pantau Progres'), findsOneWidget);
   });
 
   testWidgets('service history detail follows sparse detail-by-id response', (
@@ -1446,6 +1849,51 @@ void main() {
       find.byKey(const ValueKey('service-attachment-image-12')),
       findsNothing,
     );
+
+    await tester.ensureVisible(find.text('Lihat Status'));
+    await tester.tap(find.text('Lihat Status'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ditugaskan ke Staff'), findsOneWidget);
+    expect(find.text('Menunggu penugasan'), findsOneWidget);
+    expect(
+      find.text(
+        'Pantauan progres akan tersedia setelah management menugaskan staff.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Pantau Progres'), findsNothing);
+  });
+
+  testWidgets('pull refresh on service history reloads tickets', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = FakeApiService(
+      serviceCatalog: _serviceCatalog(),
+      serviceTickets: _serviceTickets(),
+    );
+
+    await _pumpServicesPage(tester, apiService: api);
+    await tester.ensureVisible(find.text('Lihat Riwayat'));
+    await tester.tap(find.text('Lihat Riwayat'));
+    await tester.pumpAndSettle();
+
+    expect(api.getHistoryCalls, 1);
+
+    final refreshFuture = tester
+        .state<RefreshIndicatorState>(
+          find.byKey(const ValueKey('service-refresh-indicator')),
+        )
+        .show();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await refreshFuture;
+    await tester.pumpAndSettle();
+
+    expect(api.getHistoryCalls, 2);
+    expect(find.textContaining('SR-2401'), findsOneWidget);
   });
 
   testWidgets('service attachment preview fallback handles empty url safely', (
@@ -1764,6 +2212,33 @@ Future<void> _pumpAccessPage(
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpVisitorManagementPage(
+  WidgetTester tester, {
+  ApiService? apiService,
+  Future<bool> Function(Uri url)? launchUrlOverride,
+  Future<void> Function(String text)? copyTextOverride,
+  Locale locale = const Locale('en'),
+}) async {
+  await initializeDateFormatting('id_ID');
+  await tester.binding.setSurfaceSize(const Size(800, 1400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    _localizedMaterialApp(
+      home: Scaffold(
+        body: VisitorManagementPage(
+          onBack: () {},
+          initialMode: VisitorManagementInitialMode.create,
+          apiService: apiService ?? FakeApiService(),
+          launchUrlOverride: launchUrlOverride,
+          copyTextOverride: copyTextOverride,
+        ),
+      ),
+      locale: locale,
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _pumpServicesPage(
   WidgetTester tester, {
   ApiService? apiService,
@@ -1904,6 +2379,7 @@ class FakeApiService implements ApiService {
     this.createdServiceTicket,
     this.createServiceError,
     this.serviceDetail,
+    this.serviceDetails,
     this.serviceDetailError,
     this.residentAnnouncements,
     this.residentAnnouncementsError,
@@ -1935,6 +2411,7 @@ class FakeApiService implements ApiService {
   final ServiceTicketRecord? createdServiceTicket;
   final Object? createServiceError;
   final ServiceTicketRecord? serviceDetail;
+  final List<ServiceTicketRecord>? serviceDetails;
   final Object? serviceDetailError;
   final List<CommunityAnnouncement>? residentAnnouncements;
   final Object? residentAnnouncementsError;
@@ -1984,6 +2461,7 @@ class FakeApiService implements ApiService {
   String? lastCreatePreferredSchedule;
   List<String>? lastCreateAttachmentPaths;
   List<ServiceTicketRecord>? _serviceTicketStore;
+  var _serviceDetailIndex = 0;
 
   @override
   Future<ResidentUser?> getCachedResident() async {
@@ -2104,6 +2582,12 @@ class FakeApiService implements ApiService {
     lastDetailTicketId = ticketId;
     if (serviceDetailError != null) {
       throw serviceDetailError!;
+    }
+    final details = serviceDetails;
+    if (details != null && details.isNotEmpty) {
+      final index = _serviceDetailIndex.clamp(0, details.length - 1);
+      _serviceDetailIndex += 1;
+      return details[index];
     }
     return serviceDetail ?? _serviceDetailTicket();
   }
@@ -2307,10 +2791,10 @@ VisitorAccessRecord _createdVisitorRecord({
   );
 }
 
-VisitorQrPass _visitorQrPass({int visitorId = 55}) {
+VisitorQrPass _visitorQrPass({int visitorId = 55, String? qrPayload}) {
   return VisitorQrPass(
     visitorId: visitorId,
-    qrPayload: 'VISITOR-QR-PAYLOAD-$visitorId',
+    qrPayload: qrPayload ?? 'VISITOR-QR-PAYLOAD-$visitorId',
     accessCode: visitorId == 55 ? 'AC-055' : 'AC-$visitorId',
     validUntil: '2026-06-08T16:00:00+07:00',
     status: 'Approved',
@@ -2690,6 +3174,55 @@ ServiceTicketRecord _serviceDetailTicket() {
       },
     ],
     completedAt: '',
+  );
+}
+
+ServiceTicketRecord _completedServiceDetailTicket() {
+  return ServiceTicketRecord(
+    id: 2450,
+    ticketNumber: 'SR-2450',
+    title: 'Kitchen faucet leakage',
+    description: 'Water dripping under the sink.',
+    priority: 'Medium',
+    status: 'Completed',
+    rawStatus: 'completed',
+    source: 'mobile',
+    slaTargetMinutes: 120,
+    slaDueAt: '2026-06-24T12:00:00+07:00',
+    slaState: 'Within SLA',
+    assignedTo: 'Dimas Engineering',
+    operationalTimestamp: '2026-06-24T08:45:00+07:00',
+    createdAt: '2026-06-24T08:30:00+07:00',
+    category: const ServiceSimpleRef(
+      id: 1,
+      name: 'Plumbing',
+      code: '',
+      tower: '',
+      floor: 0,
+    ),
+    subcategory: const ServiceSimpleRef(
+      id: 11,
+      name: 'Kitchen Fixture',
+      code: '',
+      tower: '',
+      floor: 0,
+    ),
+    unit: const ServiceSimpleRef(
+      id: 18,
+      name: '',
+      code: 'A-1808',
+      tower: 'Asteria',
+      floor: 18,
+    ),
+    attachments: const [],
+    timeline: const [
+      {
+        'status': 'Completed',
+        'description': 'Service request completed by technician.',
+        'created_at': '2026-06-24T11:25:00+07:00',
+      },
+    ],
+    completedAt: '2026-06-24T11:25:00+07:00',
   );
 }
 

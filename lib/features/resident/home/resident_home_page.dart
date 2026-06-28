@@ -24,12 +24,14 @@ class ResidentHomePage extends StatefulWidget {
     this.apiService,
     required this.onNavigate,
     required this.onOpenBilling,
+    required this.onOpenFacilityBooking,
   });
 
   final ResidentUser? resident;
   final ApiService? apiService;
   final ValueChanged<int> onNavigate;
   final VoidCallback onOpenBilling;
+  final VoidCallback onOpenFacilityBooking;
 
   @override
   State<ResidentHomePage> createState() => _ResidentHomePageState();
@@ -168,13 +170,15 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
         onTap: () => widget.onNavigate(3),
       ),
       _QuickAction(
-        icon: Icons.person_outline_rounded,
-        label: l10n.profile,
-        onTap: () => widget.onNavigate(4),
+        icon: Icons.event_available_outlined,
+        label: 'Booking',
+        onTap: widget.onOpenFacilityBooking,
       ),
     ];
 
     final selectedAnnouncementId = _selectedAnnouncement?.id;
+    final viewport = MediaQuery.sizeOf(context);
+    final quickAccessTopGap = viewport.height >= 740 ? 30.0 : 20.0;
 
     return ColoredBox(
       color: Colors.transparent,
@@ -190,7 +194,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
           ).animate().fadeIn(duration: 360.ms).moveY(begin: 18, end: 0),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+            padding: EdgeInsets.fromLTRB(20, quickAccessTopGap, 20, 0),
             child: _DashboardSectionHeader(
               title: l10n.quickAccess.toUpperCase(),
             ),
@@ -310,14 +314,22 @@ class _ResidenceHero extends StatelessWidget {
     final displayLocation = locationLabel.isEmpty
         ? 'Unit belum ditentukan'
         : locationLabel;
+    final viewport = MediaQuery.sizeOf(context);
+    final isNarrow = viewport.width < 380;
+    final isTall = viewport.height >= 740;
+    final headerHeight = isNarrow ? 286.0 : 292.0;
+    final billingTop = isNarrow ? 236.0 : 258.0;
+    final heroHeight = isTall ? 402.0 : 392.0;
+    final buildingBottom = isTall ? 78.0 : 82.0;
+    final orbTop = isTall ? 136.0 : 138.0;
 
     return SizedBox(
-      height: 372,
+      height: heroHeight,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            height: 286,
+            height: headerHeight,
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -330,7 +342,7 @@ class _ResidenceHero extends StatelessWidget {
 
           Positioned(
             right: -18,
-            bottom: 88,
+            bottom: buildingBottom,
             child: Icon(
               Icons.apartment_rounded,
               size: 192,
@@ -340,7 +352,7 @@ class _ResidenceHero extends StatelessWidget {
 
           Positioned(
             right: 56,
-            top: 142,
+            top: orbTop,
             child: Container(
               width: 130,
               height: 130,
@@ -416,7 +428,7 @@ class _ResidenceHero extends StatelessWidget {
           ),
 
           Positioned(
-            top: 218,
+            top: billingTop,
             left: 20,
             right: 20,
             child: _BillingHeroCard(onBillingTap: onBillingTap),

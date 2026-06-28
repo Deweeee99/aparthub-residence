@@ -13,6 +13,9 @@ class ServiceStatusBadge extends StatelessWidget {
     final color = switch (normalizedStatus) {
       'Submitted' => AppColors.info,
       'Open' => AppColors.info,
+      'Available' => AppColors.success,
+      'Booked' => AppColors.danger,
+      'Waiting Approval' => AppColors.warning,
       'Assigned' => AppColors.warning,
       'In Progress' => AppColors.gold,
       'Progress' => AppColors.gold,

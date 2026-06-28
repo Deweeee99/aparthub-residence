@@ -352,29 +352,47 @@ class ApiService {
         '/resident/visitors/$visitorId/qr',
         token: token,
       );
+
       final data = _readResponseData(response.data);
       final qrPass = VisitorQrPass.fromJson(data);
+
       appDebugLog(
         'ApiService',
         'Resident visitor QR loaded (${response.statusCode ?? 'no-status'}) for ${qrPass.visitorId}; status="${qrPass.status}", hasPayload=${qrPass.qrPayload.trim().isNotEmpty}, hasAccessCode=${qrPass.accessCode.trim().isNotEmpty}, validUntil="${qrPass.validUntil}"',
       );
+
       return qrPass;
     } on DioException catch (error) {
+      final statusCode = error.response?.statusCode;
+      final backendMessage = _readErrorMessage(error.response?.data);
+
       appDebugLog(
         'ApiService',
-        'Resident visitor QR failed: status=${error.response?.statusCode}, body=${error.response?.data}',
+        'Resident visitor QR failed: status=$statusCode, body=${error.response?.data}',
       );
-      throw _mapToFriendlyException(
-        error,
-        fallback: 'QR visitor belum bisa dimuat. Coba lagi.',
-        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+
+      if (statusCode == 401 || statusCode == 403) {
+        throw const ApiServiceException(
+          'Sesi Anda telah berakhir. Silakan login kembali.',
+        );
+      }
+
+      if (statusCode == 422) {
+        throw ApiServiceException(
+          backendMessage.isNotEmpty
+              ? backendMessage
+              : 'QR visitor belum tersedia atau sudah tidak valid.',
+        );
+      }
+
+      throw const ApiServiceException(
+        'QR visitor belum bisa dimuat. Coba lagi.',
       );
     } catch (error) {
       appDebugLog('ApiService', 'Resident visitor QR failed: $error');
-      throw _mapToFriendlyException(
-        error,
-        fallback: 'QR visitor belum bisa dimuat. Coba lagi.',
-        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+
+      throw const ApiServiceException(
+        'QR visitor belum bisa dimuat. Coba lagi.',
       );
     }
   }
@@ -525,6 +543,22 @@ class ApiService {
     return token;
   }
 
+  String _readErrorMessage(Object? data) {
+    if (data is Map) {
+      final message = data['message'];
+      if (message != null && message.toString().trim().isNotEmpty) {
+        return message.toString().trim();
+      }
+
+      final error = data['error'];
+      if (error != null && error.toString().trim().isNotEmpty) {
+        return error.toString().trim();
+      }
+    }
+
+    return '';
+  }
+
   ApiServiceException _mapToFriendlyException(
     Object error, {
     required String fallback,
@@ -536,13 +570,18 @@ class ApiService {
 
     if (error is DioException) {
       final statusCode = error.response?.statusCode;
-      if (statusCode == 401 || statusCode == 422) {
+      if (statusCode == 401 || statusCode == 403) {
         return ApiServiceException(
           unauthorizedMessage ??
-              'Login gagal. Periksa kembali akun dan password Anda.',
+              'Sesi Anda telah berakhir. Silakan login kembali.',
         );
       }
 
+      if (statusCode == 422) {
+        final message = _readErrorMessage(error.response?.data);
+
+        return ApiServiceException(message.isNotEmpty ? message : fallback);
+      }
       if (error.type == DioExceptionType.connectionTimeout ||
           error.type == DioExceptionType.receiveTimeout ||
           error.type == DioExceptionType.sendTimeout ||

@@ -644,6 +644,59 @@ class AppLocalizationsId extends AppLocalizations {
   String get assignedAfterActivation => 'Ditentukan setelah aktivasi';
 
   @override
+  String get assigned => 'Ditugaskan';
+
+  @override
+  String get progress => 'Progres';
+
+  @override
+  String get completed => 'Selesai';
+
+  @override
+  String get assignedToStaff => 'Ditugaskan ke Staff';
+
+  @override
+  String get assignedToStaffSubtitle =>
+      'Penugasan request mengikuti status terbaru dari admin.';
+
+  @override
+  String get technicianStaff => 'Teknisi / Staff';
+
+  @override
+  String get waitingForAssignment => 'Menunggu penugasan';
+
+  @override
+  String get assignmentPendingProgressLocked =>
+      'Pantauan progres akan tersedia setelah management menugaskan staff.';
+
+  @override
+  String get workInProgress => 'Pekerjaan Berlangsung';
+
+  @override
+  String get workInProgressSubtitle =>
+      'Pantau status backend, timeline, SLA, dan lampiran.';
+
+  @override
+  String get requestCompleted => 'Request Selesai';
+
+  @override
+  String get requestCompletedSubtitle =>
+      'Service request ini sudah diselesaikan oleh tim layanan.';
+
+  @override
+  String get workNotCompletedYet => 'Pekerjaan belum dinyatakan selesai.';
+
+  @override
+  String get completionPendingProgressLocked =>
+      'Detail penyelesaian akan muncul setelah management menandai request ini selesai.';
+
+  @override
+  String get trackProgress => 'Pantau Progres';
+
+  @override
+  String get viewCompletion => 'Lihat Penyelesaian';
+
+  @override
   String get informationUnavailable => 'Informasi belum tersedia';
 
   @override
@@ -677,4 +730,10 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get goodNight => 'Selamat malam,';
+
+  @override
+  String get continueToCheckIn => 'Lanjutkan ke Check-In';
+
+  @override
+  String get viewStatus => 'Lihat Status';
 }

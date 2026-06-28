@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/luxury_button.dart';
@@ -36,11 +37,20 @@ class ServiceRequestPage extends StatefulWidget {
 }
 
 class _ServiceRequestPageState extends State<ServiceRequestPage> {
+  static const _createStep = 0;
+  static const _describeStep = 1;
+  static const _submittedStep = 2;
+  static const _assignedStep = 3;
+  static const _progressStep = 4;
+  static const _completedStep = 5;
+  static const _historyStep = 6;
   static const _steps = [
     'Create',
     'Describe',
     'Submitted',
-    'Tracking',
+    'Assigned',
+    'Progress',
+    'Completed',
     'History',
   ];
   static const _priorities = ['Low', 'Medium', 'High', 'Emergency'];
@@ -72,14 +82,20 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   var _isSubmitting = false;
   String? _errorMessage;
 
-  bool get _usesDesktopFilePicker => Platform.isWindows;
+  bool get _usesDesktopFilePicker {
+    if (kIsWeb) {
+      return false;
+    }
+
+    return Platform.isWindows;
+  }
 
   @override
   void initState() {
     super.initState();
     _serviceStep = widget.initialMode == ServiceRequestInitialMode.history
-        ? 4
-        : 0;
+        ? _historyStep
+        : _createStep;
     _titleController = TextEditingController();
     _descriptionController = TextEditingController();
     _preferredScheduleController = TextEditingController();
@@ -136,7 +152,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       _isLoadingHistory = true;
       _errorMessage = null;
       if (openHistory) {
-        _serviceStep = 4;
+        _serviceStep = _historyStep;
       }
     });
 
@@ -206,7 +222,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         preferredSchedule: _preferredScheduleController.text.trim().isEmpty
             ? null
             : _preferredScheduleController.text.trim(),
-        attachmentPaths: _attachmentPaths,
+       attachmentPaths: kIsWeb ? const [] : _attachmentPaths,
       );
 
       if (!mounted) {
@@ -218,7 +234,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         _trackingTicket = ticket;
         _tickets = [ticket, ..._tickets];
         _isSubmitting = false;
-        _serviceStep = 2;
+        _serviceStep = _submittedStep;
         _historyFilter = 'All';
       });
     } catch (error) {
@@ -261,7 +277,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       }
       setState(() {
         _trackingTicket = detail;
-        _serviceStep = 3;
+        _serviceStep = _stepForServiceStatus(detail);
       });
     } catch (error) {
       if (!mounted) {
@@ -273,6 +289,54 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
             : 'Data layanan belum bisa dimuat. Coba lagi.',
       );
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    try {
+      if (_serviceStep == _createStep || _serviceStep == _describeStep) {
+        await _loadCatalog();
+        return;
+      }
+      if (_serviceStep == _historyStep) {
+        await _loadHistory();
+        return;
+      }
+      if (_serviceStep == _submittedStep ||
+          _serviceStep == _assignedStep ||
+          _serviceStep == _progressStep ||
+          _serviceStep == _completedStep) {
+        await _refreshCurrentTicketStatus();
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showServiceSnack(
+        error is ApiServiceException
+            ? error.message
+            : 'Data layanan belum bisa dimuat. Coba lagi.',
+      );
+    }
+  }
+
+  Future<void> _refreshCurrentTicketStatus() async {
+    final ticket = _activeTicket;
+    if (ticket == null) {
+      return;
+    }
+
+    final detail = await _apiService.getServiceRequestDetail(ticket.id);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _trackingTicket = detail;
+      if (_createdTicket?.id == detail.id) {
+        _createdTicket = detail;
+      }
+      _serviceStep = _stepForServiceStatus(detail);
+    });
   }
 
   void _showServiceSnack(String message) {
@@ -296,7 +360,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     return _tickets.where((ticket) => ticket.status == _historyFilter).toList();
   }
 
-  ServiceTicketRecord? get _activeTicket => _createdTicket ?? _trackingTicket;
+  ServiceTicketRecord? get _activeTicket => _trackingTicket ?? _createdTicket;
 
   void _goToStep(int step) {
     setState(() => _serviceStep = step.clamp(0, _steps.length - 1));
@@ -446,33 +510,42 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       l10n.createServiceRequest.split(' ').first,
       l10n.describeIssue,
       l10n.status,
-      l10n.trackingDetail,
+      l10n.assigned,
+      l10n.progress,
+      l10n.completed,
       l10n.serviceHistory,
     ];
 
-    return ListView(
-      key: const ValueKey('service-request-page'),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 128),
-      children: [
-        _buildHeader(context),
-        const SizedBox(height: 14),
-        ServiceStepIndicator(
-          currentStep: _serviceStep,
-          steps: steps,
-          onStepSelected: _handleStepSelected,
-        ),
-        const SizedBox(height: 16),
-        _buildStepContent(),
-      ],
+    return RefreshIndicator(
+      key: const ValueKey('service-refresh-indicator'),
+      onRefresh: _handleRefresh,
+      child: ListView(
+        key: const ValueKey('service-request-page'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 128),
+        children: [
+          _buildHeader(context),
+          const SizedBox(height: 14),
+          ServiceStepIndicator(
+            currentStep: _serviceStep,
+            steps: steps,
+            onStepSelected: _handleStepSelected,
+          ),
+          const SizedBox(height: 16),
+          _buildStepContent(),
+        ],
+      ),
     );
   }
 
   void _handleStepSelected(int step) {
-    if (step == 4) {
+    if (step == _historyStep) {
       _loadHistory(openHistory: true);
       return;
     }
-    if (step == 3 && _activeTicket != null) {
+    if (step >= _assignedStep &&
+        step <= _completedStep &&
+        _activeTicket != null) {
       _openTracking(_activeTicket!);
       return;
     }
@@ -489,7 +562,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       children: [
         IconButton(
           tooltip: l10n.back,
-          onPressed: _serviceStep == 0 || _serviceStep == 4
+          onPressed: _serviceStep == _createStep || _serviceStep == _historyStep
               ? widget.onBack
               : () => _goToStep(_serviceStep - 1),
           padding: EdgeInsets.zero,
@@ -519,10 +592,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
   Widget _buildStepContent() {
     return switch (_serviceStep) {
-      0 => _buildCreateRequest(),
-      1 => _buildDescribeIssue(),
-      2 => _buildRequestSubmitted(),
-      3 => _buildTrackingStep(),
+      _createStep => _buildCreateRequest(),
+      _describeStep => _buildDescribeIssue(),
+      _submittedStep => _buildRequestSubmitted(),
+      _assignedStep => _buildAssignedStep(),
+      _progressStep => _buildProgressStep(),
+      _completedStep => _buildCompletedStep(),
       _ => _buildTicketHistory(),
     };
   }
@@ -765,7 +840,102 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     );
   }
 
-  Widget _buildTrackingStep() {
+  Widget _buildAssignedStep() {
+    final l10n = AppLocalizations.of(context);
+    final ticket = _trackingTicket ?? _createdTicket;
+    if (ticket == null) {
+      return _ErrorStateCard(
+        message: l10n.ticketDetailUnavailable,
+        onRetry: () => _loadHistory(openHistory: true),
+      );
+    }
+
+    final assignedName = ticket.assignedTo.trim();
+
+    return WhitePremiumCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(
+            title: l10n.assignedToStaff,
+            subtitle: l10n.assignedToStaffSubtitle,
+            icon: Icons.engineering_outlined,
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  ticket.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ServiceStatusBadge(status: ticket.status),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            ticket.description.isEmpty ? '-' : ticket.description,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(height: 1.45),
+          ),
+          const SizedBox(height: 18),
+          _InfoPanel(
+            icon: Icons.engineering_outlined,
+            title: assignedName.isEmpty
+                ? l10n.waitingForAssignment
+                : assignedName,
+            subtitle: assignedName.isEmpty
+                ? l10n.assignedAfterActivation
+                : l10n.technicianStaff,
+            status: ticket.status.isEmpty ? l10n.status : ticket.status,
+          ),
+          const SizedBox(height: 8),
+          _DetailPanel(
+            rows: [
+              (l10n.ticketNumber, ticket.ticketNumber),
+              (l10n.status, ticket.status.isEmpty ? '-' : ticket.status),
+              (l10n.category, ticket.category.displayLabel),
+              (l10n.subcategory, ticket.subcategory.displayLabel),
+              (l10n.unit, ticket.unit.displayLabel),
+              (l10n.priority, ticket.priority.isEmpty ? '-' : ticket.priority),
+              (l10n.createdAt, _formatDateTime(ticket.createdAt)),
+              (
+                l10n.operationalTime,
+                ticket.operationalTimestamp.isEmpty
+                    ? '-'
+                    : _formatDateTime(ticket.operationalTimestamp),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (_hasAssignedStaff(ticket))
+            LuxuryButton(
+              label: l10n.trackProgress,
+              icon: Icons.route_outlined,
+              onPressed: () => _goToStep(_progressStep),
+            )
+          else
+            _ProgressLockedNotice(
+              message: l10n.assignmentPendingProgressLocked,
+            ),
+          const SizedBox(height: 10),
+          _OutlineActionButton(
+            label: l10n.viewHistory,
+            icon: Icons.history_outlined,
+            onPressed: () => _loadHistory(openHistory: true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressStep() {
     final l10n = AppLocalizations.of(context);
     final ticket = _trackingTicket ?? _createdTicket;
     if (ticket == null) {
@@ -780,9 +950,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CardTitle(
-            title: l10n.trackingDetail,
-            subtitle: l10n.realTimeTicketInfo,
-            icon: Icons.track_changes_outlined,
+            title: l10n.workInProgress,
+            subtitle: l10n.workInProgressSubtitle,
+            icon: Icons.construction_outlined,
           ),
           const SizedBox(height: 18),
           Row(
@@ -811,9 +981,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           _DetailPanel(
             rows: [
               (l10n.ticketNumber, ticket.ticketNumber),
+              (l10n.status, ticket.status.isEmpty ? '-' : ticket.status),
               (l10n.category, ticket.category.displayLabel),
               (l10n.subcategory, ticket.subcategory.displayLabel),
-              (l10n.priority, ticket.priority),
+              (l10n.priority, ticket.priority.isEmpty ? '-' : ticket.priority),
               (
                 l10n.assignedTo,
                 ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo,
@@ -872,13 +1043,128 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 child: _TimelineCard(item: item),
               ),
           const SizedBox(height: 18),
-          LuxuryButton(
+          if (_canShowCompletionAction(ticket)) ...[
+            LuxuryButton(
+              label: l10n.viewCompletion,
+              icon: Icons.check_circle_outline_rounded,
+              onPressed: () => _goToStep(_completedStep),
+            ),
+            const SizedBox(height: 10),
+          ] else ...[
+            _ProgressLockedNotice(
+              message: l10n.completionPendingProgressLocked,
+            ),
+            const SizedBox(height: 10),
+          ],
+          _OutlineActionButton(
             label: l10n.viewHistory,
             icon: Icons.history_outlined,
             onPressed: () => _loadHistory(openHistory: true),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCompletedStep() {
+    final l10n = AppLocalizations.of(context);
+    final ticket = _trackingTicket ?? _createdTicket;
+    if (ticket == null) {
+      return _ErrorStateCard(
+        message: l10n.ticketDetailUnavailable,
+        onRetry: () => _loadHistory(openHistory: true),
+      );
+    }
+
+    final completed = _isCompletedTicket(ticket);
+
+    return Column(
+      children: [
+        WhitePremiumCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              _SuccessIcon(
+                icon: completed
+                    ? Icons.check_rounded
+                    : Icons.hourglass_bottom_rounded,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                l10n.requestCompleted,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: completed ? AppColors.success : AppColors.warning,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                completed
+                    ? l10n.requestCompletedSubtitle
+                    : l10n.workNotCompletedYet,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _DetailPanel(
+                rows: [
+                  (l10n.ticketNumber, ticket.ticketNumber),
+                  (l10n.status, ticket.status.isEmpty ? '-' : ticket.status),
+                  (
+                    l10n.assignedTo,
+                    ticket.assignedTo.isEmpty ? '-' : ticket.assignedTo,
+                  ),
+                  (l10n.createdAt, _formatDateTime(ticket.createdAt)),
+                  (
+                    l10n.completedAt,
+                    ticket.completedAt.isEmpty
+                        ? '-'
+                        : _formatDateTime(ticket.completedAt),
+                  ),
+                  (
+                    l10n.slaState,
+                    ticket.slaState.isEmpty ? '-' : ticket.slaState,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        WhitePremiumCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.timeline,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (ticket.timeline.isEmpty)
+                _EmptyStateText(text: l10n.noTimelineUpdates)
+              else
+                for (final item in ticket.timeline)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _TimelineCard(item: item),
+                  ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        LuxuryButton(
+          label: l10n.viewHistory,
+          icon: Icons.history_outlined,
+          onPressed: () => _loadHistory(openHistory: true),
+        ),
+      ],
     );
   }
 
@@ -1091,6 +1377,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     ),
                     const SizedBox(height: 16),
                     LuxuryButton(
+                      label: l10n.viewStatus,
+                      icon: Icons.track_changes_outlined,
+                      onPressed: () => _openStatusFromDetail(ticket),
+                    ),
+                    const SizedBox(height: 10),
+                    LuxuryButton(
                       label: l10n.close,
                       icon: Icons.check_rounded,
                       onPressed: () => Navigator.of(context).pop(),
@@ -1107,6 +1399,14 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
   Future<void> _showAttachmentPreview(ServiceAttachment attachment) {
     return showServiceAttachmentPreview(context, attachment);
+  }
+
+  void _openStatusFromDetail(ServiceTicketRecord ticket) {
+    Navigator.of(context).pop();
+    setState(() {
+      _trackingTicket = ticket;
+      _serviceStep = _stepForServiceStatus(ticket);
+    });
   }
 
   String _formatDateTime(String raw) {
@@ -1135,6 +1435,45 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       parts.add('Emergency ${sla.emergency}m');
     }
     return parts.isEmpty ? 'SLA not available' : parts.join(' • ');
+  }
+
+  int _stepForServiceStatus(ServiceTicketRecord ticket) {
+    final status = _normalizedServiceStatus(ticket);
+    if (status == 'completed' || status == 'done') {
+      return _completedStep;
+    }
+    if (status == 'in progress' || status == 'progress') {
+      return _progressStep;
+    }
+    if (status == 'assigned' ||
+        status == 'submitted' ||
+        status == 'open' ||
+        status == 'pending') {
+      return _assignedStep;
+    }
+    return _progressStep;
+  }
+
+  String _normalizedServiceStatus(ServiceTicketRecord ticket) {
+    final status = ticket.status.trim().isNotEmpty
+        ? ticket.status.trim()
+        : ticket.rawStatus.trim();
+    return status.toLowerCase();
+  }
+
+  bool _isCompletedTicket(ServiceTicketRecord ticket) {
+    final status = _normalizedServiceStatus(ticket);
+    return ticket.completedAt.trim().isNotEmpty ||
+        status == 'completed' ||
+        status == 'done';
+  }
+
+  bool _canShowCompletionAction(ServiceTicketRecord ticket) {
+    return _isCompletedTicket(ticket);
+  }
+
+  bool _hasAssignedStaff(ServiceTicketRecord ticket) {
+    return ticket.assignedTo.trim().isNotEmpty;
   }
 }
 
@@ -1502,36 +1841,7 @@ class _AttachmentPreviewCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 color: AppColors.surfaceMuted,
-                child: Image.file(
-                  File(path),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) {
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.image_outlined,
-                          color: AppColors.gold.withValues(alpha: 0.82),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            _attachmentLabel(path),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                child: _buildPreviewImage(context),
               ),
             ),
           ),
@@ -1558,6 +1868,55 @@ class _AttachmentPreviewCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPreviewImage(BuildContext context) {
+    if (kIsWeb) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _AttachmentFallback(path: path),
+      );
+    }
+
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => _AttachmentFallback(path: path),
+    );
+  }
+}
+
+class _AttachmentFallback extends StatelessWidget {
+  const _AttachmentFallback({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.image_outlined,
+          color: AppColors.gold.withValues(alpha: 0.82),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            _attachmentLabel(path),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1675,6 +2034,37 @@ class _InfoPanel extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           ServiceStatusBadge(status: status),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressLockedNotice extends StatelessWidget {
+  const _ProgressLockedNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _GoldIcon(icon: Icons.lock_clock_outlined, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );

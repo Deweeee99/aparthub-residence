@@ -10,6 +10,7 @@ import 'billing/billing_page.dart';
 import 'community/community_page.dart';
 import 'home/resident_home_page.dart';
 import 'profile/profile_page.dart';
+import 'services/facility_booking_page.dart';
 import 'services/services_page.dart';
 
 class ResidentShell extends StatefulWidget {
@@ -32,6 +33,7 @@ class _ResidentShellState extends State<ResidentShell> {
   late final ApiService _apiService = widget.apiService ?? ApiService();
   var _index = 0;
   var _showBilling = false;
+  var _showFacilityBooking = false;
   ResidentUser? _resident;
   var _isHydratingResident = false;
 
@@ -84,10 +86,17 @@ class _ResidentShellState extends State<ResidentShell> {
         apiService: _apiService,
         onNavigate: (newIndex) => setState(() {
           _showBilling = false;
+          _showFacilityBooking = false;
           _index = newIndex;
         }),
         onOpenBilling: () => setState(() {
           _showBilling = true;
+          _showFacilityBooking = false;
+          _index = 0;
+        }),
+        onOpenFacilityBooking: () => setState(() {
+          _showBilling = false;
+          _showFacilityBooking = true;
           _index = 0;
         }),
       ),
@@ -107,11 +116,12 @@ class _ResidentShellState extends State<ResidentShell> {
       currentIndex: _index,
       onIndexChanged: (value) => setState(() {
         _showBilling = false;
+        _showFacilityBooking = false;
         _index = value;
       }),
       roleLabel: 'Resident App',
-      compactHeader: _index != 0 && !_showBilling,
-      showHeader: _index != 0 && !_showBilling,
+      compactHeader: _index != 0 && !_showBilling && !_showFacilityBooking,
+      showHeader: _index != 0 && !_showBilling && !_showFacilityBooking,
       items: [
         RoleNavItem(
           label: l10n.home,
@@ -145,6 +155,11 @@ class _ResidentShellState extends State<ResidentShell> {
             ? BillingPage(
                 key: const ValueKey('resident-hidden-billing-page'),
                 onBack: () => setState(() => _showBilling = false),
+              )
+            : _showFacilityBooking
+            ? FacilityBookingPage(
+                key: const ValueKey('resident-hidden-facility-booking-page'),
+                onBack: () => setState(() => _showFacilityBooking = false),
               )
             : pages[_index],
       ),

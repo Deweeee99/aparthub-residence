@@ -643,6 +643,59 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assignedAfterActivation => 'Assigned after activation';
 
   @override
+  String get assigned => 'Assigned';
+
+  @override
+  String get progress => 'Progress';
+
+  @override
+  String get completed => 'Completed';
+
+  @override
+  String get assignedToStaff => 'Assigned to Staff';
+
+  @override
+  String get assignedToStaffSubtitle =>
+      'Your request assignment follows the latest backend status.';
+
+  @override
+  String get technicianStaff => 'Technician / Staff';
+
+  @override
+  String get waitingForAssignment => 'Waiting for assignment';
+
+  @override
+  String get assignmentPendingProgressLocked =>
+      'Progress tracking will be available after management assigns staff.';
+
+  @override
+  String get workInProgress => 'Work In Progress';
+
+  @override
+  String get workInProgressSubtitle =>
+      'Track backend status, timeline updates, SLA, and attachments.';
+
+  @override
+  String get requestCompleted => 'Request Completed';
+
+  @override
+  String get requestCompletedSubtitle =>
+      'This service request has been completed by the service team.';
+
+  @override
+  String get workNotCompletedYet => 'Work is not completed yet.';
+
+  @override
+  String get completionPendingProgressLocked =>
+      'Completion details will appear after management marks this request as completed.';
+
+  @override
+  String get trackProgress => 'Track Progress';
+
+  @override
+  String get viewCompletion => 'View Completion';
+
+  @override
   String get informationUnavailable => 'Information unavailable';
 
   @override
@@ -676,4 +729,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goodNight => 'Good evening,';
+
+  @override
+  String get continueToCheckIn => 'Continue to Check-In';
+
+  @override
+  String get viewStatus => 'View Status';
 }
