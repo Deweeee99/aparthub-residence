@@ -1,0 +1,35 @@
+workflows:
+  ios-testflight-internal:
+    name: ApartHub iOS TestFlight Internal
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: momnjo
+
+    environment:
+      flutter: 3.44.0
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.globalagraripta.aparthub.residence
+
+    scripts:
+      - name: Install Flutter dependencies
+        script: |
+          flutter pub get
+
+      - name: Apply iOS signing profiles
+        script: |
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          flutter build ipa --release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
