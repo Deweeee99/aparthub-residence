@@ -24,14 +24,12 @@ class ResidentHomePage extends StatefulWidget {
     this.apiService,
     required this.onNavigate,
     required this.onOpenBilling,
-    required this.onOpenFacilityBooking,
   });
 
   final ResidentUser? resident;
   final ApiService? apiService;
   final ValueChanged<int> onNavigate;
   final VoidCallback onOpenBilling;
-  final VoidCallback onOpenFacilityBooking;
 
   @override
   State<ResidentHomePage> createState() => _ResidentHomePageState();
@@ -172,7 +170,7 @@ class _ResidentHomePageState extends State<ResidentHomePage> {
       _QuickAction(
         icon: Icons.event_available_outlined,
         label: 'Booking',
-        onTap: widget.onOpenFacilityBooking,
+        onTap: () => widget.onNavigate(1),
       ),
     ];
 

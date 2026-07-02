@@ -2,6 +2,7 @@ import '../../models/resident_user.dart';
 import '../../services/api_service.dart';
 import '../../services/app_debug_logger.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/role_scaffold.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -10,7 +11,6 @@ import 'billing/billing_page.dart';
 import 'community/community_page.dart';
 import 'home/resident_home_page.dart';
 import 'profile/profile_page.dart';
-import 'services/facility_booking_page.dart';
 import 'services/services_page.dart';
 
 class ResidentShell extends StatefulWidget {
@@ -19,11 +19,15 @@ class ResidentShell extends StatefulWidget {
     this.apiService,
     this.currentLocale = const Locale('id'),
     this.onLocaleChanged,
+    this.currentIndex = 0,
+    this.serviceChild,
   });
 
   final ApiService? apiService;
   final Locale currentLocale;
   final ValueChanged<Locale>? onLocaleChanged;
+  final int currentIndex;
+  final Widget? serviceChild;
 
   @override
   State<ResidentShell> createState() => _ResidentShellState();
@@ -31,9 +35,7 @@ class ResidentShell extends StatefulWidget {
 
 class _ResidentShellState extends State<ResidentShell> {
   late final ApiService _apiService = widget.apiService ?? ApiService();
-  var _index = 0;
   var _showBilling = false;
-  var _showFacilityBooking = false;
   ResidentUser? _resident;
   var _isHydratingResident = false;
 
@@ -84,24 +86,13 @@ class _ResidentShellState extends State<ResidentShell> {
       ResidentHomePage(
         resident: _resident,
         apiService: _apiService,
-        onNavigate: (newIndex) => setState(() {
-          _showBilling = false;
-          _showFacilityBooking = false;
-          _index = newIndex;
-        }),
+        onNavigate: _goToTab,
         onOpenBilling: () => setState(() {
           _showBilling = true;
-          _showFacilityBooking = false;
-          _index = 0;
-        }),
-        onOpenFacilityBooking: () => setState(() {
-          _showBilling = false;
-          _showFacilityBooking = true;
-          _index = 0;
         }),
       ),
       AccessPage(resident: _resident, apiService: _apiService),
-      const ServicesPage(),
+      widget.serviceChild ?? ServicesPage(apiService: _apiService),
       CommunityPage(apiService: _apiService),
       ProfilePage(
         apiService: _apiService,
@@ -113,15 +104,11 @@ class _ResidentShellState extends State<ResidentShell> {
     final l10n = AppLocalizations.of(context);
 
     return RoleScaffold(
-      currentIndex: _index,
-      onIndexChanged: (value) => setState(() {
-        _showBilling = false;
-        _showFacilityBooking = false;
-        _index = value;
-      }),
+      currentIndex: widget.currentIndex,
+      onIndexChanged: _goToTab,
       roleLabel: 'Resident App',
-      compactHeader: _index != 0 && !_showBilling && !_showFacilityBooking,
-      showHeader: _index != 0 && !_showBilling && !_showFacilityBooking,
+      compactHeader: widget.currentIndex != 0 && !_showBilling,
+      showHeader: widget.currentIndex != 0 && !_showBilling,
       items: [
         RoleNavItem(
           label: l10n.home,
@@ -156,13 +143,23 @@ class _ResidentShellState extends State<ResidentShell> {
                 key: const ValueKey('resident-hidden-billing-page'),
                 onBack: () => setState(() => _showBilling = false),
               )
-            : _showFacilityBooking
-            ? FacilityBookingPage(
-                key: const ValueKey('resident-hidden-facility-booking-page'),
-                onBack: () => setState(() => _showFacilityBooking = false),
-              )
-            : pages[_index],
+            : pages[widget.currentIndex],
       ),
     );
+  }
+
+  void _goToTab(int index) {
+    setState(() => _showBilling = false);
+    context.go(_pathForTab(index));
+  }
+
+  String _pathForTab(int index) {
+    return switch (index) {
+      1 => '/resident/access',
+      2 => '/resident/services',
+      3 => '/resident/community',
+      4 => '/resident/profile',
+      _ => '/resident',
+    };
   }
 }

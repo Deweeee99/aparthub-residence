@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/community_announcement_models.dart';
+import '../models/facility_booking_models.dart';
 import '../models/resident_user.dart';
 import '../models/service_request_models.dart';
 import '../models/visitor_access_models.dart';
@@ -438,6 +439,264 @@ class ApiService {
     }
   }
 
+  Future<List<ResidentFacility>> getResidentFacilities() async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Fetching resident facilities');
+
+    try {
+      final response = await _client.get('/resident/facilities', token: token);
+      final data = _readResponseList(response.data);
+      final facilities = data
+          .map((item) => ResidentFacility.fromJson(item))
+          .toList();
+      appDebugLog(
+        'ApiService',
+        'Resident facilities loaded (${response.statusCode ?? 'no-status'}) with ${facilities.length} items',
+      );
+      return facilities;
+    } catch (error) {
+      appDebugLog('ApiService', 'Resident facilities failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Data fasilitas belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<ResidentFacility> getResidentFacilityDetail(int facilityId) async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Fetching resident facility detail $facilityId');
+
+    try {
+      final response = await _client.get(
+        '/resident/facilities/$facilityId',
+        token: token,
+      );
+      final data = _readOptionalResponseData(response.data);
+      final facility = ResidentFacility.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Resident facility detail loaded (${response.statusCode ?? 'no-status'}) for ${facility.id}',
+      );
+      return facility;
+    } catch (error) {
+      appDebugLog('ApiService', 'Resident facility detail failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Detail fasilitas belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<ResidentFacilityAvailability> getResidentFacilityAvailability({
+    required int facilityId,
+    required String bookingDate,
+    String? timeSlot,
+  }) async {
+    final token = await _requireToken();
+    final queryParameters = <String, dynamic>{
+      'booking_date': bookingDate.trim(),
+      if ((timeSlot ?? '').trim().isNotEmpty) 'time_slot': timeSlot!.trim(),
+    };
+
+    appDebugLog(
+      'ApiService',
+      'Fetching facility availability for facility=$facilityId date=$bookingDate',
+    );
+
+    try {
+      final response = await _client.get(
+        '/resident/facilities/$facilityId/availability',
+        token: token,
+        queryParameters: queryParameters,
+      );
+      final data = _readOptionalResponseData(response.data);
+      final availability = ResidentFacilityAvailability.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Facility availability loaded (${response.statusCode ?? 'no-status'}) for facility=$facilityId; status="${availability.operationalStatus}", booked=${availability.bookedTimeSlots.length}',
+      );
+      return availability;
+    } catch (error) {
+      appDebugLog('ApiService', 'Facility availability failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Ketersediaan fasilitas belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<List<FacilityBookingRecord>> getResidentFacilityBookings() async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Fetching resident facility bookings');
+
+    try {
+      final response = await _client.get(
+        '/resident/facility-bookings',
+        token: token,
+      );
+      final data = _readResponseList(response.data);
+      final bookings = data
+          .map((item) => FacilityBookingRecord.fromJson(item))
+          .toList();
+      appDebugLog(
+        'ApiService',
+        'Facility bookings loaded (${response.statusCode ?? 'no-status'}) with ${bookings.length} items',
+      );
+      return bookings;
+    } catch (error) {
+      appDebugLog('ApiService', 'Facility bookings failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Data booking fasilitas belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<FacilityBookingRecord> getResidentFacilityBookingDetail(
+    int bookingId,
+  ) async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Fetching facility booking detail $bookingId');
+
+    try {
+      final response = await _client.get(
+        '/resident/facility-bookings/$bookingId',
+        token: token,
+      );
+      final data = _readOptionalResponseData(response.data);
+      final booking = FacilityBookingRecord.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Facility booking detail loaded (${response.statusCode ?? 'no-status'}) for ${booking.id}',
+      );
+      return booking;
+    } catch (error) {
+      appDebugLog('ApiService', 'Facility booking detail failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Detail booking belum bisa dimuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<FacilityBookingRecord> createResidentFacilityBooking({
+    required int facilityId,
+    required String bookingTitle,
+    required String bookingDate,
+    required String timeSlot,
+    String? notes,
+  }) async {
+    final token = await _requireToken();
+    appDebugLog(
+      'ApiService',
+      'Creating facility booking for facility=$facilityId date=$bookingDate',
+    );
+
+    try {
+      final response = await _client.post(
+        '/resident/facility-bookings',
+        token: token,
+        data: {
+          'facility_id': facilityId,
+          'booking_title': bookingTitle.trim(),
+          'booking_date': bookingDate.trim(),
+          'time_slot': timeSlot.trim(),
+          if ((notes ?? '').trim().isNotEmpty) 'notes': notes!.trim(),
+        },
+      );
+      final data = _readOptionalResponseData(response.data);
+      final booking = FacilityBookingRecord.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Facility booking created (${response.statusCode ?? 'no-status'}) with id ${booking.id}',
+      );
+      return booking;
+    } catch (error) {
+      appDebugLog('ApiService', 'Create facility booking failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Facility booking belum bisa dibuat. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<FacilityBookingRecord> updateResidentFacilityBooking({
+    required int bookingId,
+    required int facilityId,
+    required String bookingTitle,
+    required String bookingDate,
+    required String timeSlot,
+    String? notes,
+  }) async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Updating facility booking $bookingId');
+
+    try {
+      final response = await _client.patch(
+        '/resident/facility-bookings/$bookingId',
+        token: token,
+        data: {
+          'facility_id': facilityId,
+          'booking_title': bookingTitle.trim(),
+          'booking_date': bookingDate.trim(),
+          'time_slot': timeSlot.trim(),
+          if ((notes ?? '').trim().isNotEmpty) 'notes': notes!.trim(),
+        },
+      );
+      final data = _readOptionalResponseData(response.data);
+      final booking = FacilityBookingRecord.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Facility booking updated (${response.statusCode ?? 'no-status'}) with id ${booking.id}',
+      );
+      return booking;
+    } catch (error) {
+      appDebugLog('ApiService', 'Update facility booking failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Booking belum bisa diperbarui. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
+  Future<FacilityBookingRecord> cancelResidentFacilityBooking({
+    required int bookingId,
+    required String reason,
+  }) async {
+    final token = await _requireToken();
+    appDebugLog('ApiService', 'Cancelling facility booking $bookingId');
+
+    try {
+      final response = await _client.post(
+        '/resident/facility-bookings/$bookingId/cancel',
+        token: token,
+        data: {'reason': reason.trim()},
+      );
+      final data = _readOptionalResponseData(response.data);
+      final booking = FacilityBookingRecord.fromJson(data);
+      appDebugLog(
+        'ApiService',
+        'Facility booking cancelled (${response.statusCode ?? 'no-status'}) with id ${booking.id}',
+      );
+      return booking;
+    } catch (error) {
+      appDebugLog('ApiService', 'Cancel facility booking failed: $error');
+      throw _mapToFriendlyException(
+        error,
+        fallback: 'Booking belum bisa dibatalkan. Coba lagi.',
+        unauthorizedMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      );
+    }
+  }
+
   Future<ServiceTicketRecord> createServiceRequest({
     required int categoryId,
     required int subcategoryId,
@@ -650,6 +909,31 @@ Map<String, dynamic> _readResponseData(dynamic responseData) {
   throw const ApiServiceException(
     'Terjadi kendala saat membaca data akun resident.',
   );
+}
+
+Map<String, dynamic> _readOptionalResponseData(dynamic responseData) {
+  if (responseData is Map<String, dynamic>) {
+    final data = responseData['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return data.map((key, value) => MapEntry(key.toString(), value));
+    }
+
+    if (data is List) {
+      for (final item in data) {
+        final mapped = _readMap(item);
+        if (mapped.isNotEmpty) {
+          return mapped;
+        }
+      }
+      return const <String, dynamic>{};
+    }
+  }
+
+  return const <String, dynamic>{};
 }
 
 List<Map<String, dynamic>> _readResponseList(dynamic responseData) {

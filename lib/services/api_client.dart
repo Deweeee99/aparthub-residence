@@ -46,6 +46,21 @@ class ApiClient {
     );
   }
 
+  Future<Response<dynamic>> patch(
+    String path, {
+    Object? data,
+    String? token,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    return _send(
+      'PATCH',
+      path,
+      data: data,
+      token: token,
+      queryParameters: queryParameters,
+    );
+  }
+
   Future<Response<dynamic>> _send(
     String method,
     String path, {

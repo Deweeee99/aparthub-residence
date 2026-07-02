@@ -44,6 +44,7 @@ class RoleScaffold extends StatelessWidget {
         backgroundColor: Colors.transparent,
         appBar: showHeader
             ? AppBar(
+                automaticallyImplyLeading: false,
                 toolbarHeight: compactHeader ? 64 : 76,
                 titleSpacing: 22,
                 title: Column(

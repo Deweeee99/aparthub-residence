@@ -161,14 +161,14 @@ class _ProfilePageState extends State<ProfilePage> {
           child: _SectionHeader(title: l10n.account.toUpperCase()),
         ),
 
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-          child: LuxuryButton(
-            label: l10n.editProfile,
-            icon: Icons.edit_outlined,
-            onPressed: () => showDemoSnack(l10n.editProfile),
-          ),
-        ),
+        // Padding(
+        //   padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        //   child: LuxuryButton(
+        //     label: l10n.editProfile,
+        //     icon: Icons.edit_outlined,
+        //     onPressed: () => showDemoSnack(l10n.editProfile),
+        //   ),
+        // ),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),

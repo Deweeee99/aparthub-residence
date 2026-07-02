@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/white_premium_card.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../services/api_service.dart';
-import 'service_request_page.dart';
-
-enum _ServiceSubview { hub, request, history }
+import 'service_request/service_request_flow_scope.dart';
+import 'service_request/service_request_routes.dart';
 
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key, this.apiService});
@@ -18,43 +18,15 @@ class ServicesPage extends StatefulWidget {
 }
 
 class _ServicesPageState extends State<ServicesPage> {
-  var _activeSubview = _ServiceSubview.hub;
-
-  void _openRequest() {
-    setState(() => _activeSubview = _ServiceSubview.request);
-  }
-
-  void _openHistory() {
-    setState(() => _activeSubview = _ServiceSubview.history);
-  }
-
-  void _backToHub() {
-    setState(() => _activeSubview = _ServiceSubview.hub);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 240),
-      child: switch (_activeSubview) {
-        _ServiceSubview.request => ServiceRequestPage(
-          key: const ValueKey('service-request-flow'),
-          onBack: _backToHub,
-          initialMode: ServiceRequestInitialMode.create,
-          apiService: widget.apiService,
-        ),
-        _ServiceSubview.history => ServiceRequestPage(
-          key: const ValueKey('service-history-flow'),
-          onBack: _backToHub,
-          initialMode: ServiceRequestInitialMode.history,
-          apiService: widget.apiService,
-        ),
-        _ => _ServicesHub(
-          key: const ValueKey('services-hub'),
-          onCreateRequest: _openRequest,
-          onOpenHistory: _openHistory,
-        ),
+    return _ServicesHub(
+      key: const ValueKey('services-hub'),
+      onCreateRequest: () {
+        ServiceRequestFlowScope.of(context).resetCreateFlow();
+        context.push(ServiceRequestRoutes.create);
       },
+      onOpenHistory: () => context.push(ServiceRequestRoutes.history),
     );
   }
 }

@@ -4,10 +4,13 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/white_premium_card.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/resident_user.dart';
+import '../../../models/visitor_access_models.dart';
 import '../../../services/api_service.dart';
+import 'access_history_page.dart';
+import 'facility_booking_page.dart';
 import 'visitor_management_page.dart';
 
-enum _AccessSubview { hub, create, history }
+enum _AccessSubview { hub, create, booking, history, visitorPass }
 
 class AccessPage extends StatefulWidget {
   const AccessPage({super.key, this.resident, this.apiService});
@@ -21,6 +24,7 @@ class AccessPage extends StatefulWidget {
 
 class _AccessPageState extends State<AccessPage> {
   var _activeSubview = _AccessSubview.hub;
+  VisitorAccessRecord? _selectedVisitorForPass;
 
   void _openCreateFlow() {
     setState(() => _activeSubview = _AccessSubview.create);
@@ -30,8 +34,22 @@ class _AccessPageState extends State<AccessPage> {
     setState(() => _activeSubview = _AccessSubview.history);
   }
 
+  void _openBooking() {
+    setState(() => _activeSubview = _AccessSubview.booking);
+  }
+
+  void _openVisitorPass(VisitorAccessRecord visitor) {
+    setState(() {
+      _selectedVisitorForPass = visitor;
+      _activeSubview = _AccessSubview.visitorPass;
+    });
+  }
+
   void _backToHub() {
-    setState(() => _activeSubview = _AccessSubview.hub);
+    setState(() {
+      _selectedVisitorForPass = null;
+      _activeSubview = _AccessSubview.hub;
+    });
   }
 
   @override
@@ -45,16 +63,31 @@ class _AccessPageState extends State<AccessPage> {
           initialMode: VisitorManagementInitialMode.create,
           apiService: widget.apiService,
         ),
-        _AccessSubview.history => VisitorManagementPage(
-          key: const ValueKey('visitor-history-flow'),
+        _AccessSubview.booking => FacilityBookingPage(
+          key: const ValueKey('access-facility-booking-flow'),
           onBack: _backToHub,
+          apiService: widget.apiService,
+        ),
+        _AccessSubview.history => AccessHistoryPage(
+          key: const ValueKey('access-combined-history-flow'),
+          onBack: _backToHub,
+          onOpenVisitorPass: _openVisitorPass,
+          apiService: widget.apiService,
+        ),
+        _AccessSubview.visitorPass => VisitorManagementPage(
+          key: ValueKey(
+            'visitor-pass-flow-${_selectedVisitorForPass?.id ?? 'none'}',
+          ),
+          onBack: _openHistory,
           initialMode: VisitorManagementInitialMode.history,
           apiService: widget.apiService,
+          initialVisitorForPass: _selectedVisitorForPass,
         ),
         _ => _AccessHub(
           key: const ValueKey('visitor-access-hub'),
           resident: widget.resident,
           onCreateVisitor: _openCreateFlow,
+          onOpenBooking: _openBooking,
           onOpenHistory: _openHistory,
         ),
       },
@@ -67,11 +100,13 @@ class _AccessHub extends StatelessWidget {
     super.key,
     required this.resident,
     required this.onCreateVisitor,
+    required this.onOpenBooking,
     required this.onOpenHistory,
   });
 
   final ResidentUser? resident;
   final VoidCallback onCreateVisitor;
+  final VoidCallback onOpenBooking;
   final VoidCallback onOpenHistory;
 
   @override
@@ -114,15 +149,29 @@ class _AccessHub extends StatelessWidget {
                 onTap: onCreateVisitor,
               ),
               _AccessActionCard(
-                icon: Icons.history_rounded,
-                title: l10n.visitorHistory.replaceFirst(' ', '\n'),
-                subtitle: 'Lihat status kunjungan dan data tamu.',
+                icon: Icons.event_available_outlined,
+                title: 'Booking\nFasilitas',
+                subtitle: 'Pesan fasilitas resident dan cek jadwal tersedia.',
                 accentColor: AppColors.navy,
                 iconBackground: AppColors.blueSoft,
-                buttonLabel: l10n.viewHistory,
-                onTap: onOpenHistory,
+                buttonLabel: 'Booking Fasilitas',
+                onTap: onOpenBooking,
               ),
             ],
+          ),
+        ),
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: _AccessWideActionCard(
+            icon: Icons.history_rounded,
+            title: 'History',
+            subtitle:
+                'Lihat riwayat visitor dan booking fasilitas dalam satu tempat.',
+            accentColor: AppColors.blue,
+            iconBackground: AppColors.blueSoft,
+            buttonLabel: l10n.viewHistory,
+            onTap: onOpenHistory,
           ),
         ),
 
@@ -371,6 +420,82 @@ class _AccessActionCard extends StatelessWidget {
               Icon(Icons.arrow_forward_rounded, color: accentColor, size: 18),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccessWideActionCard extends StatelessWidget {
+  const _AccessWideActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accentColor,
+    required this.iconBackground,
+    required this.buttonLabel,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accentColor;
+  final Color iconBackground;
+  final String buttonLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return WhitePremiumCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: Icon(icon, color: accentColor, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  buttonLabel,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: accentColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Icon(Icons.arrow_forward_rounded, color: accentColor, size: 20),
         ],
       ),
     );

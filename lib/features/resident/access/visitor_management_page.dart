@@ -27,6 +27,7 @@ class VisitorManagementPage extends StatefulWidget {
     this.apiService,
     this.launchUrlOverride,
     this.copyTextOverride,
+    this.initialVisitorForPass,
   });
 
   final VoidCallback onBack;
@@ -34,6 +35,7 @@ class VisitorManagementPage extends StatefulWidget {
   final ApiService? apiService;
   final Future<bool> Function(Uri url)? launchUrlOverride;
   final Future<void> Function(String text)? copyTextOverride;
+  final VisitorAccessRecord? initialVisitorForPass;
 
   @override
   State<VisitorManagementPage> createState() => _VisitorManagementPageState();
@@ -105,7 +107,14 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
     _phoneController = TextEditingController();
     // Hold: _vehicleController kept out of active flow until backend supports it.
     // _vehicleController = TextEditingController(text: _vehicleNumber);
-    if (widget.initialMode == VisitorManagementInitialMode.history) {
+    final initialVisitorForPass = widget.initialVisitorForPass;
+    if (initialVisitorForPass != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _openVisitorPassFromHistory(initialVisitorForPass);
+        }
+      });
+    } else if (widget.initialMode == VisitorManagementInitialMode.history) {
       unawaited(_loadVisitorHistory());
     }
   }
@@ -131,6 +140,20 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
   }
 
   void _nextStep() => _goToStep(_visitorStep + 1);
+
+  void _handleTopBack() {
+    if (_visitorStep == 0 || _visitorStep == 6) {
+      widget.onBack();
+      return;
+    }
+
+    if (_visitorStep == 4 && _createdVisitor != null) {
+      widget.onBack();
+      return;
+    }
+
+    _goToStep(_visitorStep - 1);
+  }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(
@@ -734,9 +757,7 @@ class _VisitorManagementPageState extends State<VisitorManagementPage> {
       children: [
         IconButton(
           tooltip: l10n.back,
-          onPressed: _visitorStep == 0 || _visitorStep == 6
-              ? widget.onBack
-              : () => _goToStep(_visitorStep - 1),
+          onPressed: _handleTopBack,
           padding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
           alignment: Alignment.centerLeft,
